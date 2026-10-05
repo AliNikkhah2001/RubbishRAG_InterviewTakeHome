@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+traces/trace.jsonl
+traces/quota.json
+submissions/*.zip
+plots/*.png
+server/hidden_eval.json
+server/server_index.json
+# sealed: reference fix + answer-key runner must never be committed
+reference_solution/
+run_validation.py
+.DS_Store

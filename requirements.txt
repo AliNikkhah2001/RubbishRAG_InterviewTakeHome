@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+matplotlib>=3.8
+requests
