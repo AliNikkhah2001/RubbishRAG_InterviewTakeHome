@@ -212,6 +212,10 @@ def main():
         enc = open(os.path.join(tmp, "server", "hidden_eval.enc"), "rb").read()
         assert leak_probe not in enc, "plaintext leak in .enc!"
         print("enc OK: no plaintext leak")
+        # smoke test imports create __pycache__ again — purge before commit
+        for root, dirs, _ in os.walk(tmp):
+            if "__pycache__" in dirs:
+                shutil.rmtree(os.path.join(root, "__pycache__"))
 
         # purge runtime junk from tmp BEFORE merging into the working tree
         # (shutil.move nests src inside an existing dst dir — traces/traces!)
