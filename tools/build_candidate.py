@@ -213,6 +213,26 @@ def main():
         assert leak_probe not in enc, "plaintext leak in .enc!"
         print("enc OK: no plaintext leak")
 
+        # purge runtime junk from tmp BEFORE merging into the working tree
+        # (shutil.move nests src inside an existing dst dir — traces/traces!)
+        for junk in ("traces", "plots", "submissions", ".candidate.json",
+                     "__pycache__"):
+            jp = os.path.join(tmp, junk)
+            if os.path.isdir(jp) and not os.path.islink(jp):
+                shutil.rmtree(jp)
+            elif os.path.exists(jp):
+                os.remove(jp)
+        plots_dir = os.path.join(tmp, "plots")
+        os.makedirs(plots_dir, exist_ok=True)
+        open(os.path.join(plots_dir, ".gitkeep"), "w").close()
+        # fail fast on stray committable artifacts in the working tree
+        # (candidate .gitignore tracks plots/ — local test PNGs must not ship)
+        import glob as _glob
+        strays = _glob.glob(os.path.join(REPO, "plots", "*.png"))
+        if strays:
+            sys.exit("error: local test plots would ship to candidates: "
+                     f"{strays}\ndelete them and re-run.")
+
         # 6) commit onto candidate branch
         sh("git", "checkout", "-B", args.branch)
         sh("git", "rm", "-r", "--cached", "--quiet", ".")
@@ -229,6 +249,8 @@ def main():
                 os.remove(p)
         for entry in os.listdir(tmp):
             shutil.move(os.path.join(tmp, entry), os.path.join(REPO, entry))
+        assert not os.path.exists(os.path.join(REPO, "traces", "traces")), \
+            "nested traces/ slipped through!"
         sh("git", "add", "-A")
         sh("git", "add", "-f", "server/hidden_eval.enc")
         n_hidden = len(hid)
