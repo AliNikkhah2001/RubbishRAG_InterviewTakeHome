@@ -1,7 +1,6 @@
-"""Poison (contamination) docs — injected server-side, NOT in test.csv.
+"""Server-side documents — injected at index time, NOT in corpus/test.csv.
 
-They stuff high-value keywords so naive BM25 ranks them top.
-Reference fix must down-weight them (repetition penalty / slot mismatch).
+DO NOT OPEN during the interview (honor system).
 """
 POISON_TEMPLATES = [
     {"doc_id": 9000, "Category": "امتیاز و رتبه اعتباری",

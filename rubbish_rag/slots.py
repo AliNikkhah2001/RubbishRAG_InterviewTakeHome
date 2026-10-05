@@ -1,11 +1,16 @@
-"""Slot lists + BROKEN extractor (always returns empty).
+"""Query entities: reference lists + empty extractor.
 
-Slots are mandatory for this task:
-  BANK, RANK (A1..E3), PERSONA (حقیقی/حقوقی), DEBT (تسهیلاتی/مالیاتی/چک/محکومیت),
-  AMOUNT, TIME.
+Observation: swapping one word in a query can flip the correct answer
+(a bank name, a rank code, حقیقی vs حقوقی, an amount, a date...).
 
-Fix me: implement regex-based extraction AFTER normalization.
-See docs/DECORATORS_FA.md for examples.
+TODO:
+  1. Find 3 pairs of corpus rows where a single swapped span changes the answer.
+  2. Decide which spans your system must detect — and what it should do
+     when the query does NOT contain them.
+  3. Implement it here (this stub currently detects nothing).
+
+Below are starter lists mined from the corpus. Extend or replace them
+as your experiments dictate.
 """
 
 BANKS = [
@@ -17,6 +22,6 @@ RANKS = [f"{L}{N}" for L in "ABCDE" for N in "123"]
 
 
 def extract_slots_broken(query: str) -> dict:
-    # RUBBISH: sees nothing.
+    # TODO: implement. Currently detects nothing.
     return {"BANK": None, "RANK": None, "PERSONA": None, "DEBT": None,
             "AMOUNT": None, "TIME": None}

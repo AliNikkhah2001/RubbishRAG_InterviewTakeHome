@@ -1,10 +1,9 @@
 """Build visible_bench.json (shipped) + hidden_eval.json (sealed, interviewer only).
 
-Deterministic (seed 7). Types:
-  base      — original Question -> gold doc
-  slot_swap — same intent, swapped RANK/BANK slot -> gold doc for NEW slot
-  ambiguous — slots dropped -> expect clarify
-  ood_typo  — colloquial/typo paraphrase -> same gold doc
+DO NOT OPEN during the interview (honor system) — it contains the hidden
+query recipe. Use `rubbish bench` and `POST /submit` instead.
+
+Deterministic (seed 7).
 """
 import csv
 import json

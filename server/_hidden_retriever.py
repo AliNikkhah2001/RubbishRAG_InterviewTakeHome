@@ -1,11 +1,7 @@
-"""Hidden retriever — SIMULATES the remote API. In production this lives server-side.
+"""Server-side scorer — SIMULATES the remote API. In production this lives server-side.
 
 DO NOT OPEN during the interview (honor system). The CLI is the only client.
-Flaws (intentional, see docs for theory):
-  F1 raw-score fusion (0.5*normBM25 + 0.5*normDense) instead of RRF
-  F2 BM25 b=0.9 over-penalizes long Answers, no BM25+ floor
-  F3 poison docs with stuffed keywords win on BM25
-  F4 overlap-`dense` with no expansion: paraphrase/typo collapse
+Probe its behavior with `rubbish bepar` / `POST /retrieve` instead of reading this.
 """
 import json
 import math
@@ -89,9 +85,9 @@ def _log_trace(api_key, query, topk, hits):
 
 def remote_retrieve(query, topk=5, use_normalization=False, slot_filter=None,
                     api_key="demo-key"):
-    """Simulated POST /retrieve. slot_filter is IGNORED (you must filter client-side)."""
-    _ = use_normalization  # flaw: server never normalizes, even if you ask
-    _ = slot_filter  # flaw: server ignores metadata — correction layer is yours
+    """Simulated POST /retrieve."""
+    _ = use_normalization
+    _ = slot_filter
     sec = SECRETS_BY_KEY.get(api_key, SECRETS_BY_KEY["demo-key"])
     idx = _load_index()
     chunks, df, N, avgdl = idx["chunks"], idx["df"], idx["N"], idx["avgdl"]
@@ -106,7 +102,7 @@ def remote_retrieve(query, topk=5, use_normalization=False, slot_filter=None,
     max_dn = max((s[2] for s in scored), default=0) or 1.0
     hits = []
     for c, bm, dn in scored:
-        fused = 0.5 * (bm / max_bm) + 0.5 * (dn / max_dn)  # F1: raw-score add
+        fused = 0.5 * (bm / max_bm) + 0.5 * (dn / max_dn)
         hits.append({"doc_id": c["doc_id"], "chunk_id": c["chunk_id"],
                      "text": c["text"], "category": c.get("category", ""),
                      "bm25": round(bm, 4), "dense": round(dn, 4),

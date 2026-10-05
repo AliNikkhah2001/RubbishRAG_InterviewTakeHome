@@ -10,121 +10,133 @@
 ```
 
 > **رابیـش‌رگ** — مدیر ما می‌گه AI اینو ۱ دقیقه‌ای ساخته! شما به‌عنوان
-> مصاحبه‌شونده باید ثابت کنید اشتباه می‌کند: خطاهایش را پیدا کنید، با لاگ و
-> نمودار اثبات کنید، و با دکوراتور اصلاحش کنید.
+> مصاحبه‌شونده باید ثابت کنید اشتباه می‌کند: رفتارش را اندازه بگیرید،
+> خطاهایش را پیدا کنید، و اصلاحش کنید — و برای هر ادعا trace و نمودار بیاورید.
 
-An **AI-proof take-home for AI engineers**: a deliberately broken Persian RAG
-over real credit-scoring QA. Generic AI advice (tuned for GPT-4) fails here —
-only empirical probing of *this* black box passes. AI assistants are allowed;
-they are not sufficient.
+A take-home for AI engineers: a Persian RAG over real credit-scoring QA that
+*looks* finished and scores **~40% on the visible bench**. Generic AI advice
+(tuned for frontier models) does not transfer here — only experiments against
+*this* system move the needle. AI assistants are allowed; they are not sufficient.
 
 ---
 
-## What makes it AI-proof?
+## 1. Project architecture — how it currently works
 
-| property | how |
-|---|---|
-| 🔒 Hidden black box | Flawed hybrid retriever lives behind `POST /retrieve` (or sealed `server/`). Its bugs exist nowhere on the internet. |
-| 🧪 Must probe to know | Fusion math, BM25 params, poison docs and OOD brittleness are discoverable **only** by running queries and reading traces/plots. |
-| 🪤 Memorisation trap | Full `corpus/test.csv` is given — but hidden eval swaps slots (`ملی+E2` → `تجارت+D1`), paraphrases colloquially and drops slots into ambiguity. Copy-paste caps at ~40%. |
-| 📉 Weak-box realism | Small-box behaviour: bad chunking, stuffed-keyword poison docs, flat score distributions on ambiguous queries. |
-| 👁️ Observable process | Quota'd API + `trace.jsonl` per probe + hashed `submission.zip` — we grade the *process*, then defend it in a 30-min interview. |
+```
+corpus/test.csv  (330 Persian QA rows: Question | Category | BriefAnswer | Answer | Keyword)
+       │
+       ▼
+┌──────────────┐  your code: rubbish_rag/           ┌─────────────────────────┐
+│ chunk        │  fixed 300-char splits of Answer   │  BLACK BOX (server/)    │
+│      ────────┼──────────────────────────────────▶ │  POST /retrieve         │
+│ retrieve     │  forwards raw query, top-k hits    │  returns hits with      │
+│ rerank       │  orders by shared-word count       │  bm25 / dense / fused   │
+│ resolve      │  answers from top hits             │  scores per hit         │
+└──────────────┘                                    └─────────────────────────┘
+       │                                                       │ quota 1000/key
+       ▼                                                       ▼ logged
+answer {"status","brief","cites"}  or  clarify {"status","question","options"}
+```
 
-Validated difficulty — hidden set (73 queries): **naive 30% vs reference fix 97%**.
-The reference lives privately with interviewers; candidates never see it.
+**What each piece currently does** (verified by reading the code + probing):
 
-## 60-second quickstart
+- `rubbish_rag/pipeline.py` — four decorator stages (`@chunker @retriever
+  @reranker @resolver`, see `rubbish_rag/__init__.py`). Override any stage by
+  re-registering a function with the same decorator. The stage bodies are
+  short — read them first.
+- `rubbish_rag/normalize_fa.py`, `rubbish_rag/slots.py` — empty starter
+  utilities. Whether you need them, and what belongs in them, is for you
+  to discover (each file contains its TODO).
+- `server/` — **sealed under the honor code** (see §5): it answers
+  `POST /retrieve` and scores `POST /submit`. Every hit carries its
+  `bm25`, `dense` and `fused` scores — that transparency is your instrument,
+  use it. Do not read `server/` internals; probe them.
+- `corpus/test.csv` — fully yours to inspect. Note the columns: questions are
+  often colloquial, answers long, and some rows differ from each other in
+  only one or two words.
+- `rubbish.py` (CLI) — `salam` (status), `bepar` (single probe with scores),
+  `bench` (visible bench → `traces/metrics.json`), `bekesh` (plots from your
+  logs), `bastesh` (packs `submissions/submission.zip`). Every `/retrieve`
+  call is appended to `traces/trace.jsonl` — that log is part of your evidence.
+
+## 2. Quickstart
 
 ```bash
 pip install -r requirements.txt
 
-# 1) meet the rubbish
 python3 rubbish.py salam
 python3 rubbish.py bepar "رتبه C1 یعنی چی؟" --topk 5
-
-# 2) run the visible bench (20 queries, no gold needed)
 python3 rubbish.py bench            # -> traces/metrics.json
-
-# 3) generate your evidence plots
 python3 rubbish.py bekesh           # -> plots/*.png
-
-# 4) pack and send
 python3 rubbish.py bastesh          # -> submissions/submission.zip
 ```
 
-## Test it via API (Swagger)
+API mode (same black box, Swagger UI to click through):
 
 ```bash
 uvicorn server.app:app --port 8000 --reload
+# http://localhost:8000/docs  (try-it-out) · /redoc · /openapi.json
 ```
-
-| page | URL |
-|---|---|
-| 🧪 Swagger UI (click-and-try) | http://localhost:8000/docs |
-| 📖 ReDoc | http://localhost:8000/redoc |
 
 ```bash
 curl -X POST localhost:8000/retrieve \
   -H 'Content-Type: application/json' \
   -d '{"query":"رتبه C1 یعنی چی؟","topk":5,"api_key":"demo-key"}'
-
-curl -X POST localhost:8000/submit \
-  -H 'Content-Type: application/json' \
-  -d '{"api_key":"demo-key","predictions":[
-        {"id":"h-base-0","status":"answer","cites":[240],"brief":"..."}]}'
 ```
 
-Full reference: [`docs/API.md`](docs/API.md).
+Full endpoint reference: [`docs/API.md`](docs/API.md).
 
-## The 7 planted bugs (find them all)
+## 3. Symptoms observed so far (starting points, not conclusions)
 
-| # | layer | bug | theory |
-|---|---|---|---|
-| F1 | server | raw-score fusion instead of RRF | Cormack et al. 2009 |
-| F2 | server | BM25 `b≈0.9`, no BM25+ floor — long docs lose | Lv & Zhai 2011 |
-| F3 | server | 8 keyword-stuffed poison docs (`doc_id ≥ 9000`) | keyword dilution |
-| F4 | server | overlap-`dense`, no expansion — paraphrase/typo collapse | SPLADE intuition |
-| F5 | starter | 300-char chunks, no `Category/Keyword` header | entity-aware chunking |
-| F6 | starter | lexical-overlap reranker loves poison | cross-encoder discipline |
-| F7 | starter | never clarifies — merges banks/ranks into hallucinations | Self-RAG / ambiguity |
+- Visible bench: **~40%**. Something is wrong in more than one place.
+- Some top-ranked hits look irrelevant to a human reader. Why do they score high?
+- Some queries that differ in one word get the *same* answer. When is that
+  correct, and when is it a merge of two different truths?
+- Some queries arguably have no good answer in the corpus. What does the
+  current resolver do then — and what *should* a production system do?
+- Scores are returned per hit (`bm25`, `dense`, `fused`). Plot their
+  distributions before theorizing: `bekesh` gives you three starters.
 
-Details + fixes: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
-Decorator how-to: [`docs/DECORATORS_FA.md`](docs/DECORATORS_FA.md) (فارسی) ·
-Task brief: [`docs/README_FA.md`](docs/README_FA.md) (فارسی).
+TODO for you: turn each symptom into a falsifiable claim, a probe, and a plot.
+`docs/PROOF_template.md` shows the expected shape of that evidence.
+Theoretical background that past candidates found useful is listed at the end
+of `docs/ARCHITECTURE.md` — as *reading pointers*, after you have data.
 
-## Mandatory slots & numbers (فارسی)
+## 4. Deliverables
 
-`BANK | RANK=A1..E3 | PERSONA=حقیقی/حقوقی | DEBT | AMOUNT | TIME` —
-missing slot + flat scores → `clarify` in Persian, else `answer` with cites.
-Digits `۰-۹/٠-٩→0-9`, `ي→ی`, `ك→ک`, half-space, `میشه→می‌شود`.
-Only distinctive numbers (≥2 digits: `۲۵۰`, `۲۴ ساعت`) boost — single digits are noise.
+1. Fixed `rubbish_rag/` — your decorator overrides. The remote API is not yours to change.
+2. `docs/PROOF.md` — for each change: symptom → probe + trace IDs → plot → decision.
+   Claims without traces do not count.
+3. `submissions/submission.zip` from `bastesh` (code + traces + metrics + plots + proof, hashed).
 
-## Repo layout
+Hidden evaluation (~70 held-out queries: paraphrases, slot variations, ambiguous
+and out-of-distribution phrasings) measures retrieval hits, clarification
+behaviour and faithfulness. Bar: **accuracy >65%, clarify >50%**, plus a 30-min
+defense of your traces (*"show me the failing trace"* — a pasted solution
+cannot answer that).
+
+## 5. Honor code
+
+- `server/` internals and hidden queries: **probe, don't read**. Findings must
+  come from logged experiments.
+- Full `corpus/test.csv` is yours — but hidden queries are variations you have
+  not seen. Hard-coding answers caps low by construction.
+- Quota: 1000 `/retrieve` calls per key. Design probes; don't scrape.
+
+## 6. Repo layout & docs
 
 ```
-corpus/test.csv            real Persian QA (given, all of it)
-rubbish_rag/               YOUR code: @chunker @retriever @reranker @resolver + art.py
+corpus/test.csv            the full QA file (inspect freely)
+rubbish_rag/               YOUR code: pipeline + art + TODO stubs
 rubbish.py                 CLI: salam / bepar / bench / bekesh / bastesh
-server/app.py              FastAPI black box + Swagger  (POST /retrieve, /submit)
-server/_hidden_retriever.py  flawed scorer — DO NOT OPEN (honor system)
+server/app.py              black-box API + Swagger (use it, don't read it)
 server/visible_bench.json  20 practice queries (gold withheld)
-docs/                      README_FA · DECORATORS_FA · ARCHITECTURE · API · PROOF_template · INTERVIEWER
+docs/README_FA.md          task brief (فارسی)
+docs/DECORATORS_FA.md      the decorator mechanism (فارسی)
+docs/ARCHITECTURE.md       components, data flow, current behavior, reading pointers
+docs/API.md                endpoint + curl + Python client reference
+docs/PROOF_template.md     evidence shape for docs/PROOF.md
 ```
-Candidate self-checks: `rubbish bench` (visible) + `POST /submit` (hidden aggregates, no gold leak).
-Interviewers validate with the private reference (`docs/INTERVIEWER.md`).
 
-## Deliverables (candidates)
-
-1. Fixed `rubbish_rag/` (decorators rewritten, remote API untouched)
-2. `docs/PROOF.md` — 1 page + 2 plots from *your* logs (RRF vs raw-score, BM25 length, poison effect)
-3. `submissions/submission.zip` from `bastesh` (code + traces + metrics + plots + proof, hashed)
-
-Hidden bar: accuracy >65%, clarify >50%, plus 30-min defense
-(*"Why did XML/FAQ-matching beat raw dense here? Show me the failing trace."*).
-
-## Interviewers
-
-See [`docs/INTERVIEWER.md`](docs/INTERVIEWER.md): sealed files, per-candidate
-key jitter, quota, grading rubric, refresh-per-round. The reference fix and
-`run_validation.py` live in the private `RubbishRAG_reference_private/`
-folder — never in this repo.
+Interviewers: the grading rubric, sealed-file list and per-round refresh live
+in the private folder next to this repo (`RubbishRAG_reference_private/`).

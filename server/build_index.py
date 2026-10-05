@@ -1,4 +1,4 @@
-"""Build server index with INTENTIONALLY BAD chunking (fixed 300 chars, no header)."""
+"""Server-side indexing. DO NOT OPEN during the interview (honor system)."""
 import csv
 import json
 import os

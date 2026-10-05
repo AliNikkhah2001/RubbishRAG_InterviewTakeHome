@@ -7,7 +7,7 @@ Commands (funny names, serious bench):
   salam    — check key + quota
   bepar    — single probe:  rubbish bepar "رتبه C یعنی چی؟" --topk 5
   bench    — run visible bench (20 queries), save metrics.json
-  bekesh   — generate plots from your logs (score spread, length, poison)
+  bekesh   — plot score/length/repetition patterns from your logs
   bastesh  — pack submission.zip (code + traces + metrics + plots + PROOF.md)
 """
 import argparse
@@ -96,7 +96,15 @@ def cmd_bekesh(args):
     vis = json.load(open(os.path.join(BASE, "server", "visible_bench.json"),
                          encoding="utf-8"))
     gaps, lens, bms = [], [], []
-    p_bm, g_bm = [], []
+    rep_bm, plain_bm = [], []
+
+    def max_repeat(text):
+        from collections import Counter
+        toks = text.split()
+        if not toks:
+            return 0
+        return max(Counter(toks).values())
+
     for item in vis[:20]:
         hits = remote_retrieve(item["query"], topk=5, api_key=args.key)
         if hits:
@@ -104,33 +112,34 @@ def cmd_bekesh(args):
         for h in hits[:2]:
             lens.append(len(h["text"]))
             bms.append(h["bm25"])
-            if h["doc_id"] >= 9000:
-                p_bm.append(h["bm25"])
-            if h["doc_id"] == item.get("gold_doc_id"):
-                g_bm.append(h["bm25"])
+            if max_repeat(h["text"]) >= 8:
+                rep_bm.append(h["bm25"])
+            else:
+                plain_bm.append(h["bm25"])
     os.makedirs(os.path.join(BASE, "plots"), exist_ok=True)
     plt.figure()
     plt.hist(gaps, bins=10)
-    plt.title("Top1-Top5 fused gap (flat=flat=ambiguous?)")
+    plt.title("Top1-Top5 fused gap per query")
     plt.xlabel("gap")
     plt.savefig(os.path.join(BASE, "plots", "score_spread.png"))
     plt.close()
     plt.figure()
     plt.scatter(lens, bms, s=12)
-    plt.title("BM25 vs chunk length (long docs penalized?)")
+    plt.title("BM25 vs chunk length")
     plt.xlabel("chars")
     plt.ylabel("bm25")
     plt.savefig(os.path.join(BASE, "plots", "length_vs_bm25.png"))
     plt.close()
     plt.figure()
-    plt.bar(["poison_hits", "gold_hits"],
-            [sum(p_bm) / max(len(p_bm), 1), sum(g_bm) / max(len(g_bm), 1)])
-    plt.title("Mean BM25: poison vs gold (contamination?)")
-    plt.savefig(os.path.join(BASE, "plots", "poison_vs_gold.png"))
+    plt.bar(["repetitive_hits", "other_hits"],
+            [sum(rep_bm) / max(len(rep_bm), 1),
+             sum(plain_bm) / max(len(plain_bm), 1)])
+    plt.title("Mean BM25: repetitive vs other hits")
+    plt.savefig(os.path.join(BASE, "plots", "repetition_vs_bm25.png"))
     plt.close()
     print("ساخته شد: plots/score_spread.png plots/length_vs_bm25.png "
-          "plots/poison_vs_gold.png")
-    print("از این سه نمودار در PROOF.md استفاده کنید.")
+          "plots/repetition_vs_bm25.png")
+    print("این‌ها نقطه شروع‌اند — نمودارهای خودتان را هم بسازید و در PROOF.md تفسیر کنید.")
 
 
 def cmd_bastesh(args):
@@ -145,7 +154,7 @@ def cmd_bastesh(args):
                     z.write(fp, os.path.relpath(fp, BASE))
         for rel in ["traces/trace.jsonl", "traces/metrics.json",
                     "plots/score_spread.png", "plots/length_vs_bm25.png",
-                    "plots/poison_vs_gold.png",
+                    "plots/repetition_vs_bm25.png",
                     "server/visible_bench.json"]:
             fp = os.path.join(BASE, rel)
             if os.path.exists(fp):

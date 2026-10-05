@@ -1,12 +1,14 @@
-"""Broken Persian normalizer (RubbishRAG default — DO NOT SHIP LIKE THIS).
+"""Persian text normalization (currently a no-op).
 
-This is the 1-minute-AI version: it does nothing.
-Your job: fix it (see docs/DECORATORS_FA.md).
+TODO:
+  1. Take 5 queries and their correct rows. Compare the query's wording
+     with the row's wording character by character. What differs?
+     (digits? kaf/yeh? half-spaces? colloquial vs formal?)
+  2. Decide what 'the same word' means for this corpus, and implement it.
+  3. Prove the effect: same probe before/after, logged in traces/.
 """
-
-from . import chunker as _chunker_reg  # noqa (keeps import style uniform)
 
 
 def normalize_fa(text: str) -> str:
-    # RUBBISH: no digit conversion, no kaf/yeh fix, no ZWNJ handling.
+    # TODO: implement. Currently returns the input (stripped) unchanged.
     return (text or "").strip()

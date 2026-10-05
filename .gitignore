@@ -3,6 +3,8 @@ __pycache__/
 .venv/
 traces/trace.jsonl
 traces/quota.json
+traces/metrics.json
+traces/submissions.jsonl
 submissions/*.zip
 plots/*.png
 server/hidden_eval.json

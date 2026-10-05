@@ -26,8 +26,8 @@ curl localhost:8000/health
 ```
 
 ### `POST /retrieve` — the black box
-Flawed hybrid retrieval. `slot_filter`/`normalization` are intentionally
-ignored server-side — the correction layer is your job (see `docs/ARCHITECTURE.md` F1–F4).
+Retrieval over the server-side index. Each hit carries its `bm25`, `dense`
+and `fused` scores — log and plot them before theorizing (see `bekesh`).
 
 ```bash
 curl -X POST localhost:8000/retrieve \
@@ -80,13 +80,3 @@ r = requests.post(f"{API}/retrieve",
 for h in r["hits"]:
     print(h["doc_id"], h["fused"], h["text"][:80])
 ```
-
-## Production notes (interviewers)
-
-- One process per hiring round; put `server/` behind gunicorn + TLS.
-- Issue per-candidate keys: add entries to `server/_secrets.py`
-  (`k1/b/rrf_k` ±10%, new `poison_salt`), hand out the key only.
-- Watch `traces/trace.jsonl` (probe diversity) and
-  `traces/submissions.jsonl` (`/submit` history per key).
-- Never ship `server/hidden_eval.json` — `/submit` returns aggregates precisely
-  so candidates can iterate without ever seeing gold.

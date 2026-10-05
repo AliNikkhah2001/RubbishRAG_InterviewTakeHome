@@ -1,4 +1,4 @@
-"""Correct Persian normalization (for evaluator + reference fix — NOT the broken starter)."""
+"""Server-side text normalization used by the evaluator."""
 import re
 
 FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹"
