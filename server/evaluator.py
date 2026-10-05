@@ -17,6 +17,10 @@ def score_one(pred, gold):
     cites = pred.get("cites") or []
     golds = set(gold.get("acceptable") or [gold["gold_doc_id"]])
     hit = any(c in golds for c in cites[:3])
+    # citing a fabricated server-only doc (id >= 9000, never in corpus/test.csv)
+    # fails the item even when gold is also cited: verify against the file.
+    if any(isinstance(c, int) and c >= 9000 for c in cites[:3]):
+        return {"pass": False, "kind": "answer"}
     # number/rank must survive if present in gold query (anti-merge check)
     need = gold.get("must_contain") or []
     txt = normalize_fa_full(pred.get("brief", ""))

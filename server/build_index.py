@@ -29,7 +29,7 @@ def bad_chunk(text, size=300):
 
 
 def build():
-    from .poison_docs import POISON_TEMPLATES
+    from .poison_docs import POISON_TEMPLATES, SMART_POISON
     docs = load_corpus()
     # server indexes Answer (+BriefAnswer prefix) with bad chunking; question NOT indexed
     chunks = []
@@ -38,7 +38,7 @@ def build():
         for j, part in enumerate(bad_chunk(blob)):
             chunks.append({"doc_id": d["doc_id"], "chunk_id": f'{d["doc_id"]}:{j}',
                            "text": part, "category": d["Category"]})
-    for p in POISON_TEMPLATES:
+    for p in POISON_TEMPLATES + SMART_POISON:
         blob = (p["BriefAnswer"] + "\n") + p["Answer"]
         for j, part in enumerate(bad_chunk(blob)):
             chunks.append({"doc_id": p["doc_id"], "chunk_id": f'{p["doc_id"]}:{j}',
@@ -53,7 +53,7 @@ def build():
     idx = {"chunks": chunks, "df": df, "N": len(chunks),
            "avgdl": total_len / max(len(chunks), 1), "ndocs": len(docs)}
     json.dump(idx, open(OUT, "w", encoding="utf-8"), ensure_ascii=False)
-    print(f"indexed {len(docs)} docs + {len(POISON_TEMPLATES)} poison -> "
+    print(f"indexed {len(docs)} docs + {len(POISON_TEMPLATES) + len(SMART_POISON)} poison -> "
           f"{len(chunks)} chunks. N={idx['N']} avgdl={idx['avgdl']:.1f}")
     return idx
 

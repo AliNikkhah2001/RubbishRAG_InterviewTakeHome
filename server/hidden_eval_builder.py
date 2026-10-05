@@ -129,6 +129,34 @@ def build(seed=7):
                     "gold_brief": r["BriefAnswer"],
                     "gold_category": r["Category"], "expect": "answer",
                     "type": "ood_typo"})
+    # 5) poison_trap 10: server-side smart-poison docs (9100+) mimic these gold
+    # rows with ONE flipped fact. Gold = real row; trap = its mimic.
+    # Queries stay close to the gold question so BOTH surface top-3 and only
+    # number-exactness + file-corroboration separate them.
+    # (query, gold_doc_id, true distinctive tokens)
+    TRAPS = [
+        ("آیا بدهی با مبلغ خیلی کم هم باعث کاهش شدید امتیاز میشه؟", 326, ["250"]),
+        ("سابقه چک برگشتی تا چه مدت تو گزارش اعتباری شرکت میمونه؟", 30, ["5"]),
+        ("اقساط معوق شرکت تا چه مدت بعد از پرداخت بدهی رو امتیاز اثر میذاره؟", 88, ["24"]),
+        ("سهم سابقه چک تو امتیاز اشخاص حقیقی چند درصده؟", 247, ["12"]),
+        ("بازه امتیازی C2 از چند تا چنده؟", 107, ["C2", "559"]),
+        ("هزینه گزارش اعتبارسنجی شرکت‌ها و سازمان‌ها چقدره؟", 81, ["12000"]),
+        ("اگه شرکت محکومیت مالی داشته باشه رتبش چقدر میاد پایین؟", 56, ["250"]),
+        ("بازه بررسی سابقه تسهیلاتی چند ساله؟", 5, ["5"]),
+        ("چند درصد امتیاز شرکت به مالیات وابسته‌ست؟", 125, ["18"]),
+        ("سقف تسهیلات مشمول بخشنامه جنگ دوم چقدره؟", 335, ["700", "500"]),
+    ]
+    _trows = {r["doc_id"]: r for r in rows}
+    for i, (q, gid, must) in enumerate(TRAPS):
+        r = _trows.get(gid)
+        if r is None or not r["BriefAnswer"]:
+            print(f"TRAP REVIEW: gold {gid} not usable")
+            continue
+        hid.append({"id": f"h-trap-{i}", "query": q,
+                    "gold_doc_id": r["doc_id"], "gold_brief": r["BriefAnswer"],
+                    "gold_category": r["Category"], "expect": "answer",
+                    "type": "poison_trap", "must_contain": must})
+    # (paraphrase section removed)
     json.dump(hid, open(HID, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     try:
         from server._vault import save_hidden
@@ -136,7 +164,7 @@ def build(seed=7):
     except Exception as e:
         print(f"(vault enc skipped: {e})")
     print(f"visible={len(vis)} hidden={len(hid)} "
-          f"(base/swap/amb/ood={[sum(1 for h in hid if h['type']==t) for t in ['base','slot_swap','ambiguous','ood_typo']]})")
+          f"(base/swap/amb/ood/trap={[sum(1 for h in hid if h['type']==t) for t in ['base','slot_swap','ambiguous','ood_typo','poison_trap']]})")
 
 
 def load_hidden():
