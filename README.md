@@ -127,7 +127,7 @@ of `docs/ARCHITECTURE.md` — as *reading pointers*, after you have data.
    Claims without traces do not count.
 3. `submissions/submission.zip` from `bastesh` (code + traces + metrics + plots + proof, hashed).
 
-Hidden evaluation (~70 held-out queries: paraphrases, slot variations, ambiguous
+Hidden evaluation (~170 held-out queries: paraphrases, slot variations, ambiguous
 and out-of-distribution phrasings) measures retrieval hits, clarification
 behaviour and faithfulness. Bar: **accuracy >65%, clarify >50%**, plus a 30-min
 defense of your traces (*"show me the failing trace"* — a pasted solution
