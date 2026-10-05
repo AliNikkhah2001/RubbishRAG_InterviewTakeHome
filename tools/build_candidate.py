@@ -172,7 +172,9 @@ def main():
             for root, dirs, _ in os.walk(tmp):
                 if d in dirs:
                     shutil.rmtree(os.path.join(root, d))
-        os.remove(os.path.join(tmp, "server", "hidden_eval.json"))
+        # plaintext eval must never reach the candidate tree (build wrote to
+        # REPO; tmp only ever received hidden_eval.enc)
+        assert not os.path.exists(os.path.join(tmp, "server", "hidden_eval.json"))
         open(os.path.join(tmp, "server", "__init__.py"), "a").close()
 
         # 4) candidate gitignore + buildinfo + pristine report markers
