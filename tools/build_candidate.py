@@ -252,7 +252,16 @@ def main():
         assert not os.path.exists(os.path.join(REPO, "traces", "traces")), \
             "nested traces/ slipped through!"
         sh("git", "add", "-A")
-        sh("git", "add", "-f", "server/hidden_eval.enc")
+        sh("git", "add", "-f", "server/hidden_eval.enc", "server/*.pyc")
+        # sealed bytecode must be tracked (candidate .gitignore skips *.pyc)
+        sealed_tracked = sh("git", "ls-files", "server/").splitlines()
+        missing = [f"server/{m}.pyc" for m in
+                   ("_hidden_retriever", "_vault", "evaluator",
+                    "hidden_eval_builder", "build_index", "poison_docs",
+                    "_secrets", "fa_norm")
+                   if f"server/{m}.pyc" not in sealed_tracked]
+        if missing:
+            sys.exit(f"error: sealed modules missing from index: {missing}")
         n_hidden = len(hid)
         sh("git", "commit", "-m",
            f"Candidate take-home: sealed eval ({n_hidden} hidden vs 20 visible), "
