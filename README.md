@@ -61,14 +61,32 @@ answer {"status","brief","cites"}  or  clarify {"status","question","options"}
 
 ## 2. Quickstart
 
-```bash
-pip install -r requirements.txt
+> **Candidates start here — work on a fork, never on this repo directly.**
 
+```bash
+# 1) Fork on GitHub: click Fork on this repo page (your fork = your workspace)
+# 2) Clone YOUR fork and check out the task branch:
+git clone https://github.com/<YOU>/RubbishRAG_InterviewTakeHome.git
+cd RubbishRAG_InterviewTakeHome
+git checkout candidate              # task branch: minimal files, sealed eval
+git checkout -b solution/<your-github-username>
+python3 --version                   # must be 3.11.x (sealed bytecode requirement)
+pip install -r requirements.txt
+```
+
+```bash
+# 3) meet the rubbish (first run asks name/email/GitHub for the report card)
 python3 rubbish.py salam
 python3 rubbish.py bepar "رتبه C1 یعنی چی؟" --topk 5
 python3 rubbish.py bench            # -> traces/metrics.json
 python3 rubbish.py bekesh           # -> plots/*.png
-python3 rubbish.py bastesh          # -> submissions/submission.zip
+python3 rubbish.py bastesh          # stamps README report + packs submission.zip
+
+# 4) commit work + plots + README so the report renders, then push:
+git add rubbish_rag/ docs/PROOF.md plots/ README.md
+git commit -m "RubbishRAG solution"
+git push -u origin solution/<your-github-username>
+# then send submissions/submission.zip (or open a PR from your branch)
 ```
 
 API mode (same black box, Swagger UI to click through):
@@ -140,3 +158,9 @@ docs/PROOF_template.md     evidence shape for docs/PROOF.md
 
 Interviewers: the grading rubric, sealed-file list and per-round refresh live
 in the private folder next to this repo (`RubbishRAG_reference_private/`).
+
+<!-- RUBBISH-REPORT:START -->
+## 📊 My RubbishRAG Report
+
+_(Empty — run `python3 rubbish.py bastesh` to stamp your card, metrics and diagrams here.)_
+<!-- RUBBISH-REPORT:END -->
