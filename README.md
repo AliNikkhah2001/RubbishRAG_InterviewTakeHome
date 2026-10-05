@@ -148,7 +148,7 @@ corpus/test.csv            the full QA file (inspect freely)
 rubbish_rag/               YOUR code: pipeline + art + TODO stubs
 rubbish.py                 CLI: salam / bepar / bench / bekesh / bastesh
 server/app.py              black-box API + Swagger (use it, don't read it)
-server/visible_bench.json  20 practice queries (gold withheld)
+server/visible_bench.json  20 practice queries (with answers, for self-check)
 docs/README_FA.md          task brief (فارسی)
 docs/DECORATORS_FA.md      the decorator mechanism (فارسی)
 docs/ARCHITECTURE.md       components, data flow, current behavior, reading pointers
