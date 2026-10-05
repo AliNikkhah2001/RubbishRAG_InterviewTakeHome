@@ -90,11 +90,8 @@ def _quota_used(api_key: str) -> int:
 
 
 def _load_hidden():
-    p = os.path.join(BASE, "server", "hidden_eval.json")
-    if not os.path.exists(p):
-        from .hidden_eval_builder import build
-        build()
-    return json.load(open(p, encoding="utf-8"))
+    from .hidden_eval_builder import load_hidden
+    return load_hidden()
 
 
 # ---------------------------------------------------------------- routes

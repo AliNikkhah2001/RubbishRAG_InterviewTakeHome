@@ -39,8 +39,13 @@
 ```
 
 ## دستورات
+
+> روی فورک خودتان کار کنید، نه روی ریپوی اصلی:
+> `Fork` در گیت‌هاب → کلون فورک خودتان → `git checkout -b solution/<username>`
+> → `git checkout candidate` (شاخه تکلیف) → پایتون 3.11 → `pip install -r requirements.txt`
+
 ```
-python3 rubbish.py salam
+python3 rubbish.py salam        # اجرای اول: نام/ایمیل/گیت‌هاب برای کارت گزارش
 python3 rubbish.py bepar "رتبه C یعنی چی؟" --topk 5
 python3 rubbish.py bench            # بنچ visible (۲۰ سؤال) → traces/metrics.json
 python3 rubbish.py bekesh           # سه نمودار در plots/

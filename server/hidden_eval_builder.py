@@ -52,18 +52,17 @@ def build(seed=7):
 
     hid = []
     pool = rows[20:]
-    # 1) base 35
-    for i, r in enumerate(pool[:35]):
+    # 1) base 70 — verbatim corpus questions (tests FAQ discovery + rerank)
+    for i, r in enumerate(pool[:70]):
         hid.append({"id": f"h-base-{i}", "query": r["Question"],
                     "gold_doc_id": r["doc_id"], "gold_brief": r["BriefAnswer"],
                     "gold_category": r["Category"], "expect": "answer", "type": "base"})
-    # 2) slot_swap 15: rank definitions + bank decision
+    # 2) slot_swap: every rank definition + bank x rank loan decisions
     rank_docs = find_rank_docs(rows)
     ranks = sorted(rank_docs.keys())
-    for i in range(8):
-        rk = rnd.choice(ranks)
+    for rk in ranks:
         r = rank_docs[rk]
-        hid.append({"id": f"h-swap-rank-{i}", "query": f"رتبه {rk} یعنی چی؟",
+        hid.append({"id": f"h-swap-rank-{rk}", "query": f"رتبه {rk} یعنی چی؟",
                     "gold_doc_id": r["doc_id"], "gold_brief": r["BriefAnswer"],
                     "gold_category": r["Category"], "expect": "answer",
                     "type": "slot_swap", "must_contain": [rk]})
@@ -75,16 +74,18 @@ def build(seed=7):
                         if "تصمیم" in r["BriefAnswer"]
                         and "نهایی" in r["BriefAnswer"]
                         and "بانک" in r["BriefAnswer"]]
-    for i, b in enumerate(["ملی", "صادرات", "تجارت", "ملت", "سپه"][:7]):
-        rk = rnd.choice(ranks) if ranks else "E3"
-        hid.append({"id": f"h-swap-bank-{i}",
-                    "query": f"رتبه‌م {rk}ه، بانک {b} بهم وام میده؟",
-                    "gold_doc_id": bank_row["doc_id"],
-                    "acceptable": acceptable_banks,
-                    "gold_brief": bank_row["BriefAnswer"],
-                    "gold_category": bank_row["Category"], "expect": "answer",
-                    "type": "slot_swap", "must_contain": [rk, b]})
-    # 3) ambiguous 15 -> clarify
+    for i, b in enumerate(["ملی", "صادرات", "تجارت", "توسعه صادرات",
+                            "ملت", "سپه", "پاسارگاد"]):
+        for j in range(3):
+            rk = rnd.choice(ranks) if ranks else "E3"
+            hid.append({"id": f"h-swap-bank-{i}-{j}",
+                        "query": f"رتبه‌م {rk}ه، بانک {b} بهم وام میده؟",
+                        "gold_doc_id": bank_row["doc_id"],
+                        "acceptable": acceptable_banks,
+                        "gold_brief": bank_row["BriefAnswer"],
+                        "gold_category": bank_row["Category"], "expect": "answer",
+                        "type": "slot_swap", "must_contain": [rk, b]})
+    # 3) ambiguous -> clarify (short, under-specified, no near-verbatim row)
     amb = [
         "بدهی دارم چرا امتیازم بالاست؟",
         "رتبم C شده چیکار کنم که سبز بشه؟",
@@ -101,23 +102,47 @@ def build(seed=7):
         "چند درصد امتیازم از چک هست؟",
         "تسهیلاتم معوق شده چیکار کنم؟",
         "گزارشم با بانک فرق داره؟",
+        "امتیازم بد شده چرا؟",
+        "رتبم افت کرده چیکار کنم؟",
+        "وامم عقب افتاده؟",
+        "چک دارم امتیازم کم شده؟",
+        "مالیات ندادم رتبه‌م میاد پایین؟",
+        "ضامنم بدحساب بوده؟",
+        "قسطامو دیر دادم چی میشه؟",
+        "گزارشمو کجا ببینم؟",
+        "بانک بهم وام نمیده چرا؟",
+        "سابقه‌م پاک میشه؟",
+        "سوءاثر چقدر طول میکشه؟",
+        "چرا رتبم اومده پایین؟",
     ]
     for i, q in enumerate(amb):
         hid.append({"id": f"h-amb-{i}", "query": q, "gold_doc_id": -1,
                     "gold_brief": "", "gold_category": "", "expect": "clarify",
                     "type": "ambiguous"})
-    # 4) ood_typo 10: colloquialize base queries
-    for i, r in enumerate(pool[35:45]):
+    # 4) ood_typo 25: colloquialize + digit-swap + punctuation drift
+    for i, r in enumerate(pool[70:95]):
         q = r["Question"].replace("می‌شود", "میشه").replace("چقدر", "چقد")
-        q = q.replace("250", "۲۵۰") if "250" in q else q + "؟"
+        q = q.replace("است؟", "ه؟").replace("250", "۲۵۰")
+        if "؟" not in q:
+            q += "؟"
         hid.append({"id": f"h-ood-{i}", "query": q, "gold_doc_id": r["doc_id"],
                     "gold_brief": r["BriefAnswer"],
                     "gold_category": r["Category"], "expect": "answer",
                     "type": "ood_typo"})
     json.dump(hid, open(HID, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    try:
+        from server._vault import save_hidden
+        save_hidden(hid)
+    except Exception as e:
+        print(f"(vault enc skipped: {e})")
     print(f"visible={len(vis)} hidden={len(hid)} "
           f"(base/swap/amb/ood={[sum(1 for h in hid if h['type']==t) for t in ['base','slot_swap','ambiguous','ood_typo']]})")
 
 
-if __name__ == "__main__":
-    build()
+def load_hidden():
+    """Runtime loader: encrypted store first, plaintext fallback (dev only)."""
+    import os as _os
+    if _os.path.exists(HID):
+        return json.load(open(HID, encoding="utf-8"))
+    from server._vault import load_hidden as _lh
+    return _lh()
