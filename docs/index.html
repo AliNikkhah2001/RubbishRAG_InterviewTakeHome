@@ -1,112 +1,127 @@
 <!DOCTYPE html>
-<html dir="rtl" lang="fa">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RubbishRAG — تکلیف مصاحبه هوش مصنوعی</title>
+<title>RubbishRAG — AI Engineer Take-Home</title>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 800px; margin: auto; padding: 2em; line-height: 1.7; }
+  body { font-family: system-ui, sans-serif; max-width: 780px; margin: auto; padding: 2em; line-height: 1.7; }
   pre { background: #f5f5f5; padding: 1em; overflow-x: auto; border-radius: 6px; }
   code { background: #eee; padding: .1em .3em; border-radius: 3px; }
   h2 { border-bottom: 2px solid #ddd; padding-bottom: .3em; }
-  .eng { direction: ltr; }
 </style>
 </head>
 <body>
 
-<h1>🗑️ RubbishRAG</h1>
-<p><em>مدیر ما می‌گه AI اینو ۱ دقیقه‌ای ساخته! شما ثابت کنید اشتباه می‌کنه.</em></p>
+<h1>🗑️ RubbishRAG — "AI made it in 1 minute!" …prove it wrong</h1>
+<p><em>A take-home for AI engineers. AI assistants are allowed; they are not sufficient.</em></p>
 <hr>
 
-<h2>۱. داستان</h2>
+<h2>Story</h2>
 <p>
-یه سیستم RAG فارسی روی دانشنامه اعتبارسنجی (۳۳۰ سوال/جواب واقعی) که ظاهراً تمومه
-ولی <strong>فقط ~۴۰٪ روی بنچ visible جواب درست می‌ده</strong>.
-مدیر فکر می‌کنه AI تو ۱ دقیقه نوشته — شما باید ثابت کنید اشتباه می‌کنه.
-کمک هوش مصنوعی مجازه؛ کافی نیست.
+You are given a Persian RAG chatbot over a real credit-scoring knowledge base
+(330 QA pairs in <code>corpus/test.csv</code>). It <em>looks</em> finished —
+but it only scores <strong>~40% on the visible benchmark</strong>.
+Your manager says: <em>"AI built this in one minute — prove it wrong."</em>
+Find the bugs, measure them with logged probes and plots, and fix them.
+You can use any AI tools, but the bugs exist only inside this specific black box —
+generic advice won't work.
 </p>
 
-<h2>۲. چی باید کنید</h2>
+<h2>What you need to do</h2>
 <ol>
-<li><strong>فورک</strong> ریپوی ما روی گیت‌هاب.</li>
-<li><strong><code>candidate</code></strong> برنچ رو چک‌اوت کنید (کد + دیتای کامل + ایویل رمزشده).</li>
-<li><strong><code>solution/&lt;username&gt;</code></strong> برنچ بسازید.</li>
-<li>پایتون ۳.۱۱ نیازه (بایتکد رمزشده).</li>
+<li><strong>Fork</strong> the repo on GitHub.</li>
+<li>Check out the <strong><code>candidate</code></strong> branch (sealed bytecode, encrypted evaluation).</li>
+<li>Create a branch: <strong><code>solution/&lt;your-github-username&gt;</code></strong></li>
+<li><strong>Python 3.11 is required</strong> (the sealed bytecode is compiled for 3.11).</li>
 <li><code>pip install -r requirements.txt</code></li>
-<li><code>python3 rubbish.py salam</code> — اجرای اول اسم/ایمیل/گیت‌هاب رو می‌پرسه.</li>
-<li><code>python3 rubbish.py bepar "رتبه C1 یعنی چی؟" --topk 5</code></li>
-<li><code>python3 rubbish.py bench</code> — بنچ visible (۲۰ سوال با جواب).</li>
-<li><code>python3 rubbish.py bekesh</code> — سه نمودار.</li>
-<li><code>python3 rubbish.py bastesh</code> — کارنامه توی README چاپ می‌کنه + submission.zip.</li>
+<li><code>python3 rubbish.py salam</code> — first run asks for your name/email/GitHub</li>
+<li><code>python3 rubbish.py bepar "رتبه C1 یعنی چی؟" --topk 5</code> — probe the black box</li>
+<li><code>python3 rubbish.py bench</code> — run the 20-question visible benchmark</li>
+<li><code>python3 rubbish.py bekesh</code> — generate diagnostic plots</li>
+<li><code>python3 rubbish.py bastesh</code> — stamp your report card + pack submission.zip</li>
 </ol>
 
-<h2>۳. معماری (چی دارید)</h2>
+<h2>Architecture (what you are working with)</h2>
 <pre>
-corpus/test.csv → chunk (۳۰۰ کاراکتر) → POST /retrieve → hits {bm25,dense,fused}
-→ rerank (تعداد کلمات مشترک) → resolve (همیشه جواب می‌ده)
+corpus/test.csv → chunk (300-char slices) → POST /retrieve → hits {bm25,dense,fused}
+→ rerank (shared-word count) → resolve (always answers, never clarifies)
 </pre>
-<p>
-۴ تا دکوراتور داره: <code>@R.chunker @R.retriever @R.reranker @R.resolver</code>.
-فایل <code>rubbish_rag/pipeline.py</code> رو بخونید — همه چی کوتاهه و TODO داره.
-</p>
+<p>The pipeline is four stages, each a Python decorator in <code>rubbish_rag/pipeline.py</code>:</p>
 <ul>
-<li><strong>Chunker:</strong> ۳۰۰ کاراکتر برش، بدون سربرگ</li>
-<li><strong>Retriever:</strong> API ریموت — نمره‌ها رو برگردونده (bm25/dense/fused)</li>
-<li><strong>Reranker:</strong> بر اساس تعداد کلمات مشترک با کوئری</li>
-<li><strong>Resolver:</strong> همیشه جواب، هیچ‌وقت سوال clarify نمی‌پرسه</li>
+<li><strong>@chunker</strong> — splits documents into 300-char pieces (loses headers)</li>
+<li><strong>@retriever</strong> — forwards the query to the black box, returns scores per hit</li>
+<li><strong>@reranker</strong> — orders hits by word overlap with the query</li>
+<li><strong>@resolver</strong> — always returns an answer, never a clarifying question</li>
 </ul>
-
-<h2>۴. نشانه‌ها (شروع‌کننده‌ها)</h2>
-<ul>
-<li>بعضی hits به‌نظر بی‌ربط می‌یان — چرا نمرشون بالاس؟</li>
-<li>بعضی کوئری‌ها که فقط یه کلمه فرق دارن جواب یکسان می‌گیرن — کی درسته، کی قاطی کردن دو جواب مختلف؟</li>
-<li>بعضی کوئری‌ها اصلاً جواب خوبی توی کورپوس ندارن — الان چی می‌شه و چی باید بشه؟</li>
-<li>نمره‌های <code>bm25/dense/fused</code> برمی‌گردن — پلاتشون کنید قبل از تئوری.</li>
-</ul>
-
-<h2>۵. اسلات‌های مهم</h2>
 <p>
-توی این کورپوس، عوض شدن یه کلمه می‌تونه جواب رو عوض کنه:</p>
-<ul>
-<li>بانک (ملی، صادرات، تجارت، ...)</li>
-<li>رتبه (A1 تا E3)</li>
-<li>شخص (حقیقی / حقوقی)</li>
-<li>مبلغ و زمان (۲۵۰، ۵ سال، ۲۴ ساعت، ...)</li>
-<li>نوع بدهی (تسهیلاتی، مالیاتی، چک، محکومیت)</li>
-</ul>
-
-<h2>۶. قرارداد خروجی</h2>
-<pre lang="json">
-{"status": "answer",  "brief": "جواب کوتاه", "cites": [doc_id, ...]}
-{"status": "clarify", "question": "سوال ابهام؟", "options": ["گزینه۱", "گزینه۲"]}
-</pre>
-
-<h2>۷. تنظیم سرور API (برای مصاحبه‌کننده)</h2>
-<p>برای حالت آنلاین (به‌جای local):</p>
-<pre class="eng">
-# install
-pip install fastapi uvicorn
-
-# run
-uvicorn server.app:app --host 0.0.0.0 --port 8000
-
-# Swagger UI at http://YOUR_IP:8000/docs
-</pre>
-<p>
-بعد از اجرا، به هر кандидат یه <code>api_key</code> بدید و توی <code>server/_secrets.py</code>
-اضافش کنید. کلید هر نفر محدود به ۱۰۰۰ کال. لاگ کامل توی <code>traces/</code> ذخیره می‌شه.
+You can override any stage by re-registering with the same decorator
+(see <code>docs/DECORATORS_FA.md</code>). The black box itself is sealed —
+you probe it, not read it.
 </p>
 
-<h2>۸. تحویل</h2>
+<h2>What's in the black box? (the API server)</h2>
+<p>
+The <code>POST /retrieve</code> endpoint is a <strong>flawed hybrid search engine</strong>
+running locally on your machine via compiled bytecode (<code>server/*.pyc</code>).
+It combines BM25 and overlap-based dense scores — the exact fusion formula is one of the bugs you need to discover. You <strong>do not need to host any server</strong> — everything runs offline. The scoring logic and hidden evaluation queries are encrypted and never visible to you.
+</p>
+<p>
+(Interviewers may optionally deploy this on a VPS like Vast.ai for remote testing —
+if so, they will give you a URL and API key. You will set it with <code>--key</code> or <code>rubbish.py --key</code>.)
+</p>
+
+<h2>Symptoms to investigate (starting points)</h2>
+<ul>
+<li>Some top-ranked hits look irrelevant — why do they score highly?</li>
+<li>Queries that differ by one word get the same answer. When is that correct, and when is it a merge of two different truths?</li>
+<li>Some queries have no good answer in the corpus — what does the resolver currently do, and what should a production system do?</li>
+<li>The <code>bm25</code>, <code>dense</code>, and <code>fused</code> scores are returned per hit. Plot them before theorizing (<code>bekesh</code> generates three starter plots).</li>
+<li>Focus on the output contract and the evaluation rubric — think about what a scorer checks.</li>
+</ul>
+
+<h2>Important signal: slots</h2>
+<p>
+In this corpus, a single swapped word can flip the correct answer:</p>
+<ul>
+<li><strong>Bank</strong> (ملی, صادرات, تجارت, …)</li>
+<li><strong>Rank code</strong> (A1 through E3)</li>
+<li><strong>Persona</strong> (حقیقی / حقوقی — these have very different numbers)</li>
+<li><strong>Amounts and time</strong> (۲۵۰, ۵ سال, ۲۴ ساعت, …)</li>
+<li><strong>Debt type</strong> (تسهیلاتی, مالیاتی, چک, محکومیت)</li>
+</ul>
+<p>The black box does <strong>not</strong> handle these for you — that is your job.</p>
+
+<h2>Output contract (auto-graded)</h2>
+<pre>
+{"status": "answer",  "brief": "one-line answer", "cites": [doc_id, ...]}
+{"status": "clarify", "question": "مشخص کنید؟",  "options": ["گزینه۱", "گزینه۲"]}
+</pre>
+
+<h2>Deliverables</h2>
 <ol>
-<li>کد اصلاح‌شده: <code>rubbish_rag/pipeline.py</code> + <code>normalize_fa.py</code> + <code>slots.py</code></li>
-<li><code>docs/PROOF.md</code> — هر تغییر: نشانه → پروب + trace → نمودار → تصمیم</li>
-<li><code>submissions/submission.zip</code> از <code>bastesh</code></li>
-<li>پوش برنچ <code>solution/&lt;username&gt;</code> + ارسال فایل zip</li>
+<li>Fixed code: <code>rubbish_rag/pipeline.py</code> + <code>normalize_fa.py</code> + <code>slots.py</code></li>
+<li><code>docs/PROOF.md</code> — one section per change: symptom → probe + trace IDs → plot → decision</li>
+<li><code>submissions/submission.zip</code> from <code>rubbish bastesh</code></li>
+<li>Push your <code>solution/&lt;username&gt;</code> branch and/or submit the zip</li>
 </ol>
+<p>Hidden evaluation (~170 held-out queries) measures accuracy, clarification behavior, and citation faithfulness. Bar: <strong>accuracy &gt;65%, clarify &gt;50%</strong>, plus a 30-min defense of your traces.</p>
+
+<h2>Getting started</h2>
+<pre>
+git clone https://github.com/YOUR_USERNAME/RubbishRAG_InterviewTakeHome.git
+cd RubbishRAG_InterviewTakeHome
+git checkout candidate
+git checkout -b solution/your-github-username
+pip install -r requirements.txt
+python3 rubbish.py salam
+python3 rubbish.py bepar "رتبه C1 یعنی چی؟" --topk 5
+python3 rubbish.py bench
+python3 rubbish.py bekesh
+</pre>
 
 <hr>
-<p class="eng"><a href="https://github.com/AliNikkhah2001/RubbishRAG_InterviewTakeHome">GitHub repo</a> • مصاحبه‌کننده: <code>git checkout candidate</code></p>
+<p><a href="https://github.com/AliNikkhah2001/RubbishRAG_InterviewTakeHome">GitHub repo</a></p>
 
 </body>
 </html>
