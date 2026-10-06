@@ -46,7 +46,6 @@ ALLOW = [
     "rubbish_rag/identity.py",
     "server/app.py",
     "server/visible_bench.json",
-    "docs/README.md",
     "docs/ARCHITECTURE.md",
     "docs/API.md",
     "docs/PROOF_template.md",
