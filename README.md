@@ -159,6 +159,31 @@ docs/PROOF_template.md     evidence shape for docs/PROOF.md
 Interviewers: the grading rubric, sealed-file list and per-round refresh live
 in the private folder next to this repo (`RubbishRAG_reference_private/`).
 
+## Setting up the API server (for remote/hosted interviews)
+
+Run the black-box API on a VPS so candidates can probe it over the network:
+
+```bash
+git clone https://github.com/AliNikkhah2001/RubbishRAG_InterviewTakeHome.git
+cd RubbishRAG_InterviewTakeHome
+pip install -r requirements.txt
+uvicorn server.app:app --host 0.0.0.0 --port 8000
+```
+
+- **Swagger UI** → `http://<your-ip>:8000/docs` (interactive test page)
+- **ReDoc** → `http://<your-ip>:8000/redoc`
+- **Health check** → `GET /health`
+
+Create per-candidate API keys in `server/_secrets.py` (each key has its own quota counter and trace log). The default `demo-key` works for local testing but should be replaced in production. Full endpoint reference: [`docs/API.md`](docs/API.md).
+
+## GitHub Pages
+
+This repo ships a task instruction page in `docs/index.html` (bilingual Persian/English). To host it:
+
+1. Go to **Settings → Pages** on your GitHub fork
+2. Source: **Deploy from a branch** → `main` → `/docs`
+3. Save — the page appears at `https://<you>.github.io/RubbishRAG_InterviewTakeHome/`
+
 <!-- RUBBISH-REPORT:START -->
 ## 📊 My RubbishRAG Report
 
