@@ -93,22 +93,22 @@ git push -u origin solution/<your-github-username>
 
 ---
 
-## 3. The 10 Planted Faults (Starting Points for Investigation)
+## 3. Observed Failure Modes & Investigation Areas
 
-The black box and naive pipeline contain 10 deliberate flaws:
+When probing the baseline pipeline and retrieval scores, pay attention to these 10 distinct failure modes and architectural challenges:
 
-| Fault | Component | Description & Expected Remedy |
+| Area | Component | Observed Failure Mode & Investigation Goal |
 |---|---|---|
-| **F1** | Score Fusion | Raw min-max combination `0.5*(bm25/max) + 0.5*(dense/max)` distorts ranking. Replace with client-side **Reciprocal Rank Fusion (RRF)**. |
-| **F2** | BM25 Length Bias | Excessive penalty $b=0.9, k_1=1.2$ penalizes detailed gold answers. Analyze with `plots/length_vs_bm25.png`. |
-| **F3** | Poison Documents | 8 keyword-stuffed fake documents (IDs 9000–9007). Citing a doc ID $\ge 9000$ automatically fails the item. |
-| **F4** | Persian Normalization | Starter `normalize_fa` is a no-op. Fails on Persian/Arabic digits (`۲۵۰` vs `250`), Arabic characters (`ي/ك/ة`), and half-spaces (`\u200c`). |
-| **F5** | Blind Chunking | Fixed 300-char slices discard question metadata, categories, and split sentences mid-number. |
-| **F6** | Word-Overlap Trap | Naive reranker (`len(q & toks)`) favors repetitive spam over distinctive entities. |
-| **F7** | Resolver Never Clarifies | Ambiguous queries (e.g. general "بدهی دارم") score 0% unless routed to `{"status": "clarify", ...}`. |
-| **F8** | Polarity Blindness | Bag-of-words counters fail on negation particles (`نمی‌شود` vs `می‌شود`, `فاقد` vs `دارای`). |
-| **F9** | Context Dilution | Multiple slices from the same document flood the top-$k$ window. Requires document deduplication. |
-| **F10**| Smart Poison Mimics | 10 fake documents (IDs 9100–9109) mimic real answers with 1 flipped number. Grounding against `corpus/test.csv` is required. |
+| **1. Score Fusion** | Retrieval | The naive min-max scaling `0.5*(bm25/max) + 0.5*(dense/max)` can distort relative rankings when outliers occur. Investigate rank-based fusion (such as Reciprocal Rank Fusion). |
+| **2. Length Bias** | Sparse Retrieval | Document length penalty parameters can overly penalize thorough, informative answers. Use `plots/length_vs_bm25.png` to analyze length distributions. |
+| **3. Adversarial / Poison Documents** | Corpus & Reranking | Spurious or keyword-stuffed documents exist in the index (doc IDs &ge; 9000). Ensure your pipeline filters or demotes unverified documents. |
+| **4. Persian Script Variations** | Normalization | Variations in Persian/Arabic digits (`۲۵۰` vs `250`), Arabic characters (`ي/ك/ة`), and half-spaces (`\u200c`) degrade text match rates. Implement robust text canonicalization. |
+| **5. Chunking Strategy** | Chunker | Fixed-width character chunking severs entity names, category metadata, and numerical thresholds. Design boundary- and metadata-aware chunking. |
+| **6. Reranking Sensitivity** | Reranker | Naive bag-of-words overlap favors repetitive keyword stuffing over specific entity matches. Incorporate domain entity awareness and term importance. |
+| **7. Ambiguity Resolution** | Resolver | Underspecified queries (such as generic credit status questions) lack necessary parameters. Implement dynamic clarification to request missing details. |
+| **8. Polarity & Negation** | Semantic Matching | Unigrams often fail to distinguish opposing polarity (e.g. `می‌شود` vs `نمی‌شود`). Account for negation indicators during scoring. |
+| **9. Context Redundancy** | Deduplication | Slices from identical documents can crowd top-k retrieval windows. Implement deduplication to maximize evidence diversity. |
+| **10. Fact Verification** | Grounding | Subtle factual variations across documents can mislead generators. Ground retrieval against verified reference entries in `corpus/test.csv`. |
 
 ---
 

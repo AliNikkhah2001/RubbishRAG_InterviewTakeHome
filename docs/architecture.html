@@ -107,47 +107,47 @@ answer {"status":"answer","brief":"...","cites":[...]}  OR  clarify {"status":"c
       Because $b = 0.9$ is excessively high without a BM25+ floor, thorough answers that explain credit rules in detail are severely penalized compared to short fragments.
     </p>
 
-    <h2>The Planted Algorithmic Faults</h2>
+    <h2>Observed Failure Modes & Investigation Areas</h2>
     <div class="card-grid">
       <div class="card">
-        <h3>F1: Linear Fusion Trap</h3>
-        <p>Min-max normalization distorts ranks. Must be replaced by rank-based fusion (RRF).</p>
+        <h3>1. Linear Fusion Distortion</h3>
+        <p>Min-max normalization can distort relative ranks in the presence of outliers. Investigate rank-based fusion (RRF).</p>
       </div>
       <div class="card">
-        <h3>F2: BM25 Length Bias</h3>
-        <p>High $b=0.9$ penalizes informative answers. Needs length-binned compensation.</p>
+        <h3>2. BM25 Length Bias</h3>
+        <p>High length penalty ($b=0.9$) penalizes long informative answers. Analyze with length-binned diagnostic plots.</p>
       </div>
       <div class="card">
-        <h3>F3: Poison Documents</h3>
-        <p>18 server-injected fake documents (IDs 9000+). Citing them results in an immediate zero.</p>
+        <h3>3. Adversarial / Noise Documents</h3>
+        <p>Unverified keyword-stuffed documents exist in the index (doc IDs &ge; 9000). Ensure your pipeline filters or demotes them.</p>
       </div>
       <div class="card">
-        <h3>F4: Persian Script Drift</h3>
-        <p>Digits (۲۵۰ vs 250), Arabic chars (ي/ك/ة), and colloquialisms (میشه vs می‌شود) score 0 overlap.</p>
+        <h3>4. Persian Script Variations</h3>
+        <p>Digits (۲۵۰ vs 250), Arabic characters (ي/ك/ة), and colloquial forms (میشه vs می‌شود) require robust canonicalization.</p>
       </div>
       <div class="card">
-        <h3>F5: Fragmented Chunking</h3>
-        <p>Fixed 300-char slices sever numbers from their units and discard category headers.</p>
+        <h3>5. Fragmented Chunking</h3>
+        <p>Fixed 300-char slices sever numbers from units and discard category headers. Design metadata-aware chunks.</p>
       </div>
       <div class="card">
-        <h3>F6: Naive Word Reranker</h3>
-        <p>Word overlap favors keyword-stuffed spam over precise slot entities.</p>
+        <h3>6. Bag-of-Words Reranker Trap</h3>
+        <p>Simple token overlap favors repetitive keyword spam over precise credit entities. Implement entity-aware scoring.</p>
       </div>
       <div class="card">
-        <h3>F7: Resolver Never Clarifies</h3>
-        <p>Ambiguous queries with missing entities score 0% unless routed to clarify status.</p>
+        <h3>7. Ambiguity Resolution Gating</h3>
+        <p>Queries missing required decision entities should trigger the clarification contract rather than hallucinating answers.</p>
       </div>
       <div class="card">
-        <h3>F8: Polarity Blindness</h3>
-        <p>Negation particles (نمی‌شود vs می‌شود) are ignored by bag-of-words counters.</p>
+        <h3>8. Polarity & Negation Sensitivity</h3>
+        <p>Negation particles (نمی‌شود vs می‌شود) are ignored by bag-of-words counters, leading to opposite conclusions.</p>
       </div>
       <div class="card">
-        <h3>F9: Duplicate Stuffing</h3>
-        <p>Multiple chunks from the same doc crowd the top-k window, diluting context.</p>
+        <h3>9. Context Redundancy</h3>
+        <p>Redundant chunks from the same document crowd top-k retrieval. Implement deduplication to broaden evidence.</p>
       </div>
       <div class="card">
-        <h3>F10: Smart Poison Mimics</h3>
-        <p>Fake docs (9100+) mimic real style with 1 flipped number. Grounding against corpus file is required.</p>
+        <h3>10. Fact Verification & Grounding</h3>
+        <p>Subtle metric discrepancies between candidates and reference facts require grounding against <code>corpus/test.csv</code>.</p>
       </div>
     </div>
   </div>
