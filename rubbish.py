@@ -24,7 +24,7 @@ import zipfile
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
-from rubbish_rag.art import LOGO_BIG as LOGO
+from rubbish_rag.art import LOGO_LONG as LOGO
 from rubbish_rag.identity import ensure_identity
 
 
