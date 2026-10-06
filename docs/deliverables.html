@@ -32,7 +32,7 @@
     </div>
 
     <h1>📋 Deliverables & Grading Standards</h1>
-    <p class="lead">What you must submit, how submissions are automatically evaluated against held-out queries, and what the interview defense entails.</p>
+    <p class="lead">What you must submit, how submissions are evaluated, and how to present your findings.</p>
 
     <h2>Required Deliverables</h2>
     <div class="card-grid">
@@ -116,18 +116,18 @@
       </div>
     </div>
 
-    <h2>The 30-Minute Interview Defense</h2>
+    <h2>Technical Discussion & Presentation</h2>
     <p>
-      During the follow-up technical interview, you will defend your findings:
+      In the technical interview, be prepared to walk through your engineering decisions and methodology:
     </p>
     <ul>
-      <li><em>"Show me the exact failing trace where generic Rank C scored higher than Rank C3, and explain what you modified."</em></li>
-      <li><em>"What is the impact on precision when increasing top-k from 5 to 10 on ambiguous queries?"</em></li>
-      <li><em>"Why did you choose the distinctive number threshold ($\ge 2$ digits)?"</em></li>
-      <li><em>"How does your pipeline ensure poison documents are never cited in top-3 answers?"</em></li>
+      <li>Walk through your investigation process and how you identified key failure modes using diagnostic probes.</li>
+      <li>Explain the trade-offs you made when balancing retrieval recall, precision, and response latency.</li>
+      <li>Discuss how your solution handles edge cases such as script variations, ambiguity, and conflicting information.</li>
+      <li>Demonstrate your changes by referencing the empirical data and plots generated in your report.</li>
     </ul>
     <p>
-      Because candidates must cite specific trace IDs from their own session logs, pasted or AI-generated solutions without experimental grounding cannot survive this defense.
+      Ensure your findings and proposed architectural changes are backed by real probe logs and reproducible experiments.
     </p>
   </div>
 

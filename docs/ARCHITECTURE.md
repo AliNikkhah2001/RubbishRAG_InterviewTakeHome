@@ -1,8 +1,8 @@
 # ARCHITECTURE — components, data flow, and current behavior
 
 > This document describes what the system **currently does**. What it
-> *should* do is your TODO. For the fix recipes see nothing — there are none
-> here on purpose. Graders hold the analysis privately.
+> *should* do is your investigation. Discovering and verifying the appropriate
+> fixes through experimental evidence is the core of this challenge.
 
 ```
 corpus/test.csv
