@@ -1,15 +1,16 @@
-#!/usr/bin/env python3
-"""RubbishRAG CLI — your only tool.
+"""RubbishRAG CLI — your evaluation and development toolkit.
 
 Your boss said AI built this in 1 minute. Prove it wrong.
 
 Commands:
-  salam    — check key + quota
-  bepar    — single probe:  rubbish bepar "سوال چی؟" --topk 5
-  bench    — run visible bench (20 queries), save metrics.json
-  rapchik  — generate diagnostic plots from your logs
-  bastesh  — stamp README report card + pack submission.zip
-             (code + identity + traces + metrics + plots + PROOF.md)
+  salam        — check key + quota
+  bepar        — single probe:  rubbish bepar "سوال چی؟" --topk 5
+  bench        — run visible bench (20 queries), save metrics.json
+  bekesh       — generate diagnostic plots from your logs (alias: rapchik)
+  bastesh      — stamp README report card + pack submission.zip
+  chat         — interactive terminal chat with clarification loop
+  ui           — launch the minimalistic web studio playground
+  orchestrate  — run the end-to-end LangChain-style orchestrator
 """
 import argparse
 import datetime
@@ -24,7 +25,7 @@ import zipfile
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
-from rubbish_rag.art import LOGO_LONG as LOGO
+from rubbish_rag.art import LOGO_CLEAN as LOGO
 from rubbish_rag.identity import ensure_identity
 
 
@@ -60,8 +61,8 @@ def _quota(key):
 def cmd_salam(args):
     print(LOGO)
     print(f"Key: {args.key} | Quota used: {_quota(args.key)} / 1000")
-    print("Corpus: corpus/test.csv (full copy, all ~440 rows)")
-    print("Start: rubbish bepar \"رتبه C یعنی چی؟\"")
+    print("Corpus: corpus/test.csv (full copy, 330 distinct Persian credit QA rows)")
+    print("Start: rubbish bepar \"رتبه C1 یعنی چی؟\"")
 
 
 def cmd_bepar(args):
@@ -293,6 +294,61 @@ def cmd_bastesh(args):
     print("Submit this file. Tampering is detectable.")
 
 
+def cmd_orchestrate(args):
+    print(LOGO)
+    from rubbish_rag.orchestrator import get_orchestrator
+    orch = get_orchestrator(api_key=args.key)
+    res = orch.run(args.query, topk=args.topk)
+    print("--- Orchestrator Result ---")
+    print(json.dumps(res, ensure_ascii=False, indent=2))
+
+
+def cmd_chat(args):
+    print(LOGO)
+    print("RubbishRAG Interactive Clarification Loop (Type 'exit' or 'q' to quit)")
+    print("-" * 64)
+    from rubbish_rag.orchestrator import get_orchestrator
+    orch = get_orchestrator(api_key=args.key)
+    while True:
+        try:
+            q = input("\nQuery > ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nExiting chat.")
+            break
+        if not q or q.lower() in ("exit", "quit", "q"):
+            break
+        res = orch.run(q)
+        if res.get("status") == "clarify":
+            print(f"\n[⚠️  نیاز به شفاف‌سازی]: {res.get('question')}")
+            opts = res.get("options", [])
+            for idx, opt in enumerate(opts, 1):
+                print(f"   {idx}) {opt}")
+            try:
+                choice = input("\nگزینه یا پاسخ شما > ").strip()
+                if choice.isdigit() and 1 <= int(choice) <= len(opts):
+                    selected = opts[int(choice) - 1]
+                    res2 = orch.run(f"{q} ({selected})")
+                else:
+                    res2 = orch.run(f"{q} ({choice})")
+                print(f"\n[✅ پاسخ نهایی]: {res2.get('brief')}")
+                print(f"  ارجاعات (Cites): {res2.get('cites')}")
+            except (EOFError, KeyboardInterrupt):
+                break
+        else:
+            print(f"\n[✅ پاسخ]: {res.get('brief')}")
+            print(f"  ارجاعات (Cites): {res.get('cites')}")
+
+
+def cmd_ui(args):
+    print(LOGO)
+    print(f"Launching RubbishRAG Studio UI at http://localhost:{args.port} ...")
+    try:
+        import uvicorn
+        uvicorn.run("server.app:app", host="0.0.0.0", port=args.port, reload=False)
+    except ImportError:
+        sys.exit("Error: uvicorn is required for web UI. Run `pip install -r requirements.txt`.")
+
+
 def main():
     ap = argparse.ArgumentParser(prog="rubbish")
     ap.add_argument("--key", default="demo-key")
@@ -303,13 +359,34 @@ def main():
     p.add_argument("--topk", type=int, default=5)
     sub.add_parser("bench")
     sub.add_parser("bekesh")
+    sub.add_parser("rapchik")  # alias for bekesh
     sub.add_parser("bastesh")
+    sub.add_parser("chat")
+
+    p_orch = sub.add_parser("orchestrate")
+    p_orch.add_argument("query")
+    p_orch.add_argument("--topk", type=int, default=5)
+
+    p_ui = sub.add_parser("ui")
+    p_ui.add_argument("--port", type=int, default=8000)
+
     args = ap.parse_args()
     _check_sealed_compat()
     ensure_identity()
-    {"salam": cmd_salam, "bepar": cmd_bepar, "bench": cmd_bench,
-     "bekesh": cmd_bekesh, "bastesh": cmd_bastesh}[args.cmd](args)
+    cmd_map = {
+        "salam": cmd_salam,
+        "bepar": cmd_bepar,
+        "bench": cmd_bench,
+        "bekesh": cmd_bekesh,
+        "rapchik": cmd_bekesh,
+        "bastesh": cmd_bastesh,
+        "chat": cmd_chat,
+        "orchestrate": cmd_orchestrate,
+        "ui": cmd_ui,
+    }
+    cmd_map[args.cmd](args)
 
 
 if __name__ == "__main__":
     main()
+

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Architecture — RubbishRAG</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <a href="index.html" class="brand">
+    <span class="brand-icon">🗑️</span>
+    <span>RubbishRAG</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html">📌 Overview & Story</a></li>
+    <li><a href="architecture.html" class="active">🏛️ System Architecture</a></li>
+    <li><a href="guide.html">🛠️ Engineering Guide</a></li>
+    <li><a href="deliverables.html">📋 Deliverables & Rubric</a></li>
+    <li><a href="ui.html">🚀 Web Studio & Orchestrator</a></li>
+  </ul>
+  <div class="sidebar-footer">
+    <p>RubbishRAG v1.0<br>ICS Interview Benchmark</p>
+  </div>
+</aside>
+
+<div class="main-wrapper">
+  <div class="container">
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+      <span class="badge badge-primary">Technical Specification</span>
+    </div>
+
+    <h1>🏛️ System Architecture & Data Flow</h1>
+    <p class="lead">How RubbishRAG currently processes queries, how the black-box scorer operates, and where the algorithmic failure modes originate.</p>
+
+    <h2>Pipeline Data Flow</h2>
+    <pre><code>corpus/test.csv  (330 Persian Credit-Scoring QA Pairs: Question | Category | BriefAnswer | Answer | Keyword)
+       │
+       ▼
+┌──────────────┐  rubbish_rag/pipeline.py              ┌─────────────────────────────────┐
+│ @chunker     │  Fixed 300-char splits of Answer      │  BLACK BOX (server/)            │
+│      ────────┼─────────────────────────────────────▶ │  POST /retrieve                 │
+│ @retriever   │  Forwards raw query, top-k hits       │  Computes BM25, Dense & Fused   │
+│ @reranker    │  Orders by shared-word count          │  Returns hits with scores       │
+│ @resolver    │  Answers from top hits                └─────────────────────────────────┘
+└──────────────┘                                                       │ Quota: 1000/key
+       │                                                               ▼ Logged in trace.jsonl
+       ▼
+answer {"status":"answer","brief":"...","cites":[...]}  OR  clarify {"status":"clarify","question":"...","options":[...]}</code></pre>
+
+    <h2>Core Pipeline Stages</h2>
+    <p>The candidate codebase is divided into four decorator-managed stages in <code>rubbish_rag/pipeline.py</code>:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Stage</th>
+          <th>Decorator</th>
+          <th>Current Naive Implementation</th>
+          <th>Expected Candidate Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Chunker</strong></td>
+          <td><code>@R.chunker</code></td>
+          <td>Fixed 300-character slices of Answer; completely drops Category, Keyword, and question context.</td>
+          <td>Header-aware chunking preserving metadata (<code>[Category | Keyword]</code>) with sentence boundary awareness.</td>
+        </tr>
+        <tr>
+          <td><strong>Retriever</strong></td>
+          <td><code>@R.retriever</code></td>
+          <td>Forwards the raw query to the black box untouched with no text normalization.</td>
+          <td>Persian script normalization, number unification, and dual query expansion.</td>
+        </tr>
+        <tr>
+          <td><strong>Reranker</strong></td>
+          <td><code>@R.reranker</code></td>
+          <td>Sorts hits strictly by raw shared-word count (<code>len(set(q) & set(d))</code>).</td>
+          <td>Slot-aware scoring (Rank, Bank, Debt, Persona), distinctive number boosts, and poison penalty.</td>
+        </tr>
+        <tr>
+          <td><strong>Resolver</strong></td>
+          <td><code>@R.resolver</code></td>
+          <td>Always outputs <code>status: answer</code> using the top hit, even when ambiguous or contradictory.</td>
+          <td>Ambiguity router: returns <code>clarify</code> with dynamic options when key decision slots are missing.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Scoring Mathematics in the Black Box</h2>
+
+    <h3>1. Flawed Linear Score Fusion (F1)</h3>
+    <p>The black-box server combines sparse BM25 and overlap dense scores using naive min-max scaling:</p>
+    <pre><code>fused = 0.5 * (bm25 / max(BM25)) + 0.5 * (dense / max(Dense))</code></pre>
+    <p>
+      <strong>Why this fails:</strong> BM25 and dense scores follow completely different probability distributions. A single extreme outlier score compresses the entire score space, causing lower-ranked hits to cluster artificially.
+      <strong>The fix:</strong> Candidates should implement <strong>Reciprocal Rank Fusion (RRF)</strong> client-side:
+    </p>
+    <pre><code>RRF_score(d) = Σ [ 1 / (60 + rank_m(d)) ]</code></pre>
+
+    <h3>2. Aggressive BM25 Document Length Penalty (F2)</h3>
+    <p>The BM25 formula in the server is parameterized with $k_1 = 1.2$ and $b = 0.9$:</p>
+    <pre><code>denom = f + k1 * (1 - b + b * (doc_len / avgdl))</code></pre>
+    <p>
+      Because $b = 0.9$ is excessively high without a BM25+ floor, thorough answers that explain credit rules in detail are severely penalized compared to short fragments.
+    </p>
+
+    <h2>The Planted Algorithmic Faults</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3>F1: Linear Fusion Trap</h3>
+        <p>Min-max normalization distorts ranks. Must be replaced by rank-based fusion (RRF).</p>
+      </div>
+      <div class="card">
+        <h3>F2: BM25 Length Bias</h3>
+        <p>High $b=0.9$ penalizes informative answers. Needs length-binned compensation.</p>
+      </div>
+      <div class="card">
+        <h3>F3: Poison Documents</h3>
+        <p>18 server-injected fake documents (IDs 9000+). Citing them results in an immediate zero.</p>
+      </div>
+      <div class="card">
+        <h3>F4: Persian Script Drift</h3>
+        <p>Digits (۲۵۰ vs 250), Arabic chars (ي/ك/ة), and colloquialisms (میشه vs می‌شود) score 0 overlap.</p>
+      </div>
+      <div class="card">
+        <h3>F5: Fragmented Chunking</h3>
+        <p>Fixed 300-char slices sever numbers from their units and discard category headers.</p>
+      </div>
+      <div class="card">
+        <h3>F6: Naive Word Reranker</h3>
+        <p>Word overlap favors keyword-stuffed spam over precise slot entities.</p>
+      </div>
+      <div class="card">
+        <h3>F7: Resolver Never Clarifies</h3>
+        <p>Ambiguous queries with missing entities score 0% unless routed to clarify status.</p>
+      </div>
+      <div class="card">
+        <h3>F8: Polarity Blindness</h3>
+        <p>Negation particles (نمی‌شود vs می‌شود) are ignored by bag-of-words counters.</p>
+      </div>
+      <div class="card">
+        <h3>F9: Duplicate Stuffing</h3>
+        <p>Multiple chunks from the same doc crowd the top-k window, diluting context.</p>
+      </div>
+      <div class="card">
+        <h3>F10: Smart Poison Mimics</h3>
+        <p>Fake docs (9100+) mimic real style with 1 flipped number. Grounding against corpus file is required.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span>RubbishRAG Documentation Suite</span>
+    <span><a href="guide.html">Next: Engineering Guide →</a></span>
+  </footer>
+</div>
+
+</body>
+</html>

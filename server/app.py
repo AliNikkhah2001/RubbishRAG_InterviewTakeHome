@@ -18,6 +18,7 @@ import json
 import os
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -158,3 +159,52 @@ def quota(api_key: str):
     from ._secrets import QUOTA
     return {"key": api_key, "used": _quota_used(api_key),
             "max": QUOTA["max_retrieve"]}
+
+
+class StudioQueryRequest(BaseModel):
+    query: str
+    mode: str = "orchestrator"  # "naive" or "orchestrator"
+    topk: int = 5
+
+
+@app.get("/", response_class=HTMLResponse, summary="RubbishRAG Interactive Studio UI")
+@app.get("/ui", response_class=HTMLResponse, summary="RubbishRAG Interactive Studio UI")
+def serve_ui():
+    ui_path = os.path.join(BASE, "server", "ui.html")
+    if os.path.exists(ui_path):
+        with open(ui_path, encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h2>Studio UI template not found</h2>", status_code=404)
+
+
+@app.post("/studio/query", summary="Interactive studio query endpoint")
+def studio_query(req: StudioQueryRequest):
+    if req.mode == "orchestrator":
+        try:
+            from rubbish_rag.orchestrator import get_orchestrator
+            orch = get_orchestrator()
+            res = orch.run(req.query, topk=req.topk)
+            # Ensure hits format
+            if "hits" not in res and res.get("status") == "clarify":
+                # provide hits for inspection
+                from server import _hidden_retriever as hr
+                raw_hits = hr.remote_retrieve(req.query, topk=req.topk, api_key="studio")
+                res["hits"] = raw_hits
+            return res
+        except Exception as e:
+            return {"status": "error", "brief": f"Orchestrator error: {str(e)}", "cites": [], "hits": []}
+    else:
+        # Naive pipeline
+        import rubbish_rag as R
+        import rubbish_rag.pipeline  # noqa
+        from server import _hidden_retriever as hr
+        hits = hr.remote_retrieve(req.query, topk=req.topk, api_key="studio")
+        reranked = R.get("reranker")(req.query, hits)
+        pred = R.get("resolver")(req.query, reranked)
+        return {
+            "status": pred.get("status", "answer"),
+            "brief": pred.get("brief", ""),
+            "cites": pred.get("cites", []),
+            "hits": reranked
+        }
+

@@ -24,7 +24,7 @@ def rerank(query, hits):
 
 @R.resolver
 def resolve(query, hits):
-    # Must return answer or clarify contract (see docs/README.md or docs/index.html).
+    # Must return answer or clarify contract (see README.md or docs/index.html).
     # Default: always answer.
 ```
 

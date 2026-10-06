@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deliverables & Grading Rubric — RubbishRAG</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <a href="index.html" class="brand">
+    <span class="brand-icon">🗑️</span>
+    <span>RubbishRAG</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html">📌 Overview & Story</a></li>
+    <li><a href="architecture.html">🏛️ System Architecture</a></li>
+    <li><a href="guide.html">🛠️ Engineering Guide</a></li>
+    <li><a href="deliverables.html" class="active">📋 Deliverables & Rubric</a></li>
+    <li><a href="ui.html">🚀 Web Studio & Orchestrator</a></li>
+  </ul>
+  <div class="sidebar-footer">
+    <p>RubbishRAG v1.0<br>ICS Interview Benchmark</p>
+  </div>
+</aside>
+
+<div class="main-wrapper">
+  <div class="container">
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+      <span class="badge badge-primary">Evaluation Rubric</span>
+    </div>
+
+    <h1>📋 Deliverables & Grading Standards</h1>
+    <p class="lead">What you must submit, how submissions are automatically evaluated against held-out queries, and what the interview defense entails.</p>
+
+    <h2>Required Deliverables</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3>1. Fixed Pipeline Code</h3>
+        <p>Your implementations in <code>rubbish_rag/</code> (overrides for <code>@chunker</code>, <code>@retriever</code>, <code>@reranker</code>, <code>@resolver</code>).</p>
+      </div>
+      <div class="card">
+        <h3>2. Evidence Document (PROOF.md)</h3>
+        <p>A concise document following <code>docs/PROOF_template.md</code> linking every architectural change to exact trace IDs and plot files.</p>
+      </div>
+      <div class="card">
+        <h3>3. Signed Submission Zip</h3>
+        <p>Generated automatically via <code>python3 rubbish.py bastesh</code> containing your code, identity, metrics, plots, and SHA256 manifest.</p>
+      </div>
+    </div>
+
+    <h2>Packaging Your Submission</h2>
+    <p>Run the packaging command from your repository root:</p>
+    <pre><code>python3 rubbish.py bastesh</code></pre>
+    <p>This command automatically:</p>
+    <ul>
+      <li>Calculates benchmark metrics and stamps your candidate card directly into <code>README.md</code>.</li>
+      <li>Packages code, traces (<code>traces/trace.jsonl</code>), plots, and <code>docs/PROOF.md</code> into <code>submissions/submission.zip</code>.</li>
+      <li>Computes a SHA256 integrity hash to detect post-run tampering.</li>
+    </ul>
+
+    <h2>Evaluation & Scoring Rubric</h2>
+    <p>Submissions are evaluated on a held-out sealed evaluation suite of ~168 queries spanning five distinct testing categories:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Query Count</th>
+          <th>Evaluation Focus</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Base FAQ Queries</strong></td>
+          <td>70 queries</td>
+          <td>Verbatim and near-verbatim retrieval over credit scoring regulations.</td>
+        </tr>
+        <tr>
+          <td><strong>Slot Swap Queries</strong></td>
+          <td>36 queries</td>
+          <td>Evaluates sensitivity to flipped bank names, rank codes ($A1..E3$), and loan policies.</td>
+        </tr>
+        <tr>
+          <td><strong>Ambiguous Queries</strong></td>
+          <td>27 queries</td>
+          <td>Measures whether the system appropriately asks clarifying questions instead of hallucinating.</td>
+        </tr>
+        <tr>
+          <td><strong>OOD / Colloquial / Typos</strong></td>
+          <td>25 queries</td>
+          <td>Tests resilience to Persian script drift, half-space omissions, colloquial verb forms, and digits.</td>
+        </tr>
+        <tr>
+          <td><strong>Poison Traps</strong></td>
+          <td>10 queries</td>
+          <td>Adversarial test cases targeting server-injected fake documents (IDs &ge; 9000). Citing a poison doc fails the item.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Passing Thresholds</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3>Overall Accuracy</h3>
+        <p><strong>&gt; 65%</strong> on held-out evaluation (Naive baseline: ~25–30%).</p>
+      </div>
+      <div class="card">
+        <h3>Clarification Accuracy</h3>
+        <p><strong>&gt; 50%</strong> on ambiguous queries (Naive baseline: 0%).</p>
+      </div>
+      <div class="card">
+        <h3>Trace Integrity</h3>
+        <p>Trace diversity with &ge; 15 distinct probes logged across multiple testing sessions.</p>
+      </div>
+    </div>
+
+    <h2>The 30-Minute Interview Defense</h2>
+    <p>
+      During the follow-up technical interview, you will defend your findings:
+    </p>
+    <ul>
+      <li><em>"Show me the exact failing trace where generic Rank C scored higher than Rank C3, and explain what you modified."</em></li>
+      <li><em>"What is the impact on precision when increasing top-k from 5 to 10 on ambiguous queries?"</em></li>
+      <li><em>"Why did you choose the distinctive number threshold ($\ge 2$ digits)?"</em></li>
+      <li><em>"How does your pipeline ensure poison documents are never cited in top-3 answers?"</em></li>
+    </ul>
+    <p>
+      Because candidates must cite specific trace IDs from their own session logs, pasted or AI-generated solutions without experimental grounding cannot survive this defense.
+    </p>
+  </div>
+
+  <footer class="footer">
+    <span>RubbishRAG Documentation Suite</span>
+    <span><a href="ui.html">Next: Web Studio & Orchestrator →</a></span>
+  </footer>
+</div>
+
+</body>
+</html>

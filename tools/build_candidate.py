@@ -44,12 +44,20 @@ ALLOW = [
     "rubbish_rag/normalize_fa.py",
     "rubbish_rag/slots.py",
     "rubbish_rag/identity.py",
+    "rubbish_rag/orchestrator.py",
     "server/app.py",
+    "server/ui.html",
     "server/visible_bench.json",
     "docs/ARCHITECTURE.md",
     "docs/API.md",
+    "docs/DECORATORS.md",
     "docs/PROOF_template.md",
     "docs/index.html",
+    "docs/architecture.html",
+    "docs/guide.html",
+    "docs/deliverables.html",
+    "docs/style.css",
+    "docs/ui.html",
 ]
 
 SEALED = [

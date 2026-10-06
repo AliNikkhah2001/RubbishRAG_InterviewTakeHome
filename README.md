@@ -1,188 +1,203 @@
 # 🗑️ RubbishRAG — "AI made it in 1 minute!" …prove it wrong
 
-..-+%@@%%%%%*=:... ..................... .:=#%%%%%@%:..
-%%....+%@@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@@@*:..-%%.
-@%.*@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@%=.@@.
-"AI made it in 1 minute! …prove it wrong"
-
+```text
+  ╔═════════════════════════════════════════════════════════════════╗
+  ║    ____        _     _     _     _     ____      _    ____      ║
+  ║   |  _ \ _   _| |__ | |__ (_)___| |__ |  _ \    / \  / ___|     ║
+  ║   | |_) | | | | '_ \| '_ \| / __| '_ \| |_) |  / _ \| |  _      ║
+  ║   |  _ <| |_| | |_) | |_) | \__ \ | | |  _ <  / ___ \ |_| |     ║
+  ║   |_| \_\\__,_|_.__/|_.__/|_|___/_| |_|_| \_\/_/   \_\____|     ║
+  ║                                                                 ║
+  ║       "AI made it in 1 minute!" ... prove it wrong              ║
+  ╚═════════════════════════════════════════════════════════════════╝
 ```
 
-> **RubbishRAG** — Your boss said AI built this in 1 minute. Prove it wrong.
-> Measure its behavior, find the bugs, fix them — and back every claim with traces and plots.
+> **RubbishRAG** — Your boss claimed an AI built this Persian credit-scoring RAG in 1 minute. Prove them wrong.
+> Measure its behavior, diagnose the root causes, fix the pipeline stages — and back every claim with logged traces and empirical plots.
 
-A take-home for AI engineers: a Persian RAG over real credit-scoring QA that
-*looks* finished and scores **~40% on the visible bench**. Generic AI advice
-(tuned for frontier models) does not transfer here — only experiments against
-*this* system move the needle. AI assistants are allowed; they are not sufficient.
+A take-home interview challenge for **AI / ML / RAG Engineers**: a Persian retrieval-augmented generation system over real credit-scoring QA ([`corpus/test.csv`](corpus/test.csv), 330 verified QA pairs) that *looks* finished on the surface, but scores only **~25–30% on the visible benchmark**. 
+
+Generic AI advice (tuned for English frontier models) fails here. The bugs are grounded inside Persian script variation, flawed score fusion, aggressive length penalties, server-injected poison documents, and ungrounded resolvers. AI assistants are permitted; **systematic engineering and empirical data are required**.
+
+📖 **Full Multi-Page Documentation:** Hosted on [GitHub Pages](https://alinikkhah2001.github.io/RubbishRAG_InterviewTakeHome/) (or browse locally in [`docs/index.html`](docs/index.html)).
 
 ---
 
-## 1. Project architecture — how it currently works
+## 1. System Architecture & Data Flow
 
-```
-corpus/test.csv  (330 Persian QA rows: Question | Category | BriefAnswer | Answer | Keyword)
+```text
+corpus/test.csv  (330 Persian Credit-Scoring QA Pairs: Question | Category | BriefAnswer | Answer | Keyword)
        │
        ▼
-┌──────────────┐  your code: rubbish_rag/           ┌─────────────────────────┐
-│ chunk        │  fixed 300-char splits of Answer   │  BLACK BOX (server/)    │
-│      ────────┼──────────────────────────────────▶ │  POST /retrieve         │
-│ retrieve     │  forwards raw query, top-k hits    │  returns hits with      │
-│ rerank       │  orders by shared-word count       │  bm25 / dense / fused   │
-│ resolve      │  answers from top hits             │  scores per hit         │
-└──────────────┘                                    └─────────────────────────┘
-       │                                                       │ quota 1000/key
-       ▼                                                       ▼ logged
-answer {"status","brief","cites"}  or  clarify {"status","question","options"}
+┌──────────────┐  rubbish_rag/pipeline.py              ┌─────────────────────────────────┐
+│ @chunker     │  Fixed 300-char splits of Answer      │  BLACK BOX (server/)            │
+│      ────────┼─────────────────────────────────────▶ │  POST /retrieve                 │
+│ @retriever   │  Forwards raw query, top-k hits       │  Computes BM25, Dense & Fused   │
+│ @reranker    │  Orders by shared-word count          │  Returns hits with scores       │
+│ @resolver    │  Answers from top hits                └─────────────────────────────────┘
+└──────────────┘                                                       │ Quota: 1000 calls/key
+       │                                                               ▼ Logged in trace.jsonl
+       ▼
+answer {"status":"answer","brief":"...","cites":[...]}  OR  clarify {"status":"clarify","question":"...","options":[...]}
 ```
 
-**What each piece currently does** (verified by reading the code + probing):
+### Components:
+- **`rubbish_rag/pipeline.py`**: Four decorator stages (`@chunker`, `@retriever`, `@reranker`, `@resolver`). Override any stage by registering your improved functions.
+- **`rubbish_rag/normalize_fa.py` & `slots.py`**: Persian normalization and entity slot extraction utilities.
+- **`rubbish_rag/orchestrator.py`**: **(Bonus)** End-to-end production orchestrator with Reciprocal Rank Fusion, poison penalty, and dynamic clarification.
+- **`server/`**: **Sealed under the honor code** (see §5). Answers `/retrieve` and computes scores. Every hit carries `bm25`, `dense`, and `fused` scores. Do not read server internals; probe them.
+- **`corpus/test.csv`**: The ground-truth credit scoring dataset (330 distinct questions and answers).
+- **`rubbish.py`**: Candidate CLI toolkit: `salam` (status), `bepar` (single probe), `bench` (visible benchmark), `bekesh` / `rapchik` (plots), `chat` (interactive clarification loop), `ui` (web playground), and `bastesh` (submission packager).
 
-- `rubbish_rag/pipeline.py` — four decorator stages (`@chunker @retriever
-  @reranker @resolver`, see `rubbish_rag/__init__.py`). Override any stage by
-  re-registering a function with the same decorator. The stage bodies are
-  short — read them first.
-- `rubbish_rag/normalize_fa.py`, `rubbish_rag/slots.py` — empty starter
-  utilities. Whether you need them, and what belongs in them, is for you
-  to discover (each file contains its TODO).
-- `server/` — **sealed under the honor code** (see §5): it answers
-  `POST /retrieve` and scores `POST /submit`. Every hit carries its
-  `bm25`, `dense` and `fused` scores — that transparency is your instrument,
-  use it. Do not read `server/` internals; probe them.
-- `corpus/test.csv` — fully yours to inspect. Note the columns: questions are
-  often colloquial, answers long, and some rows differ from each other in
-  only one or two words.
-- `rubbish.py` (CLI) — `salam` (status), `bepar` (single probe with scores),
-  `bench` (visible bench → `traces/metrics.json`), `bekesh` (plots from your
-  logs), `bastesh` (packs `submissions/submission.zip`). Every `/retrieve`
-  call is appended to `traces/trace.jsonl` — that log is part of your evidence.
+---
 
 ## 2. Quickstart
 
-> **Candidates start here — work on a fork, never on this repo directly.**
+Work on a GitHub fork of this repository:
 
 ```bash
-# 1) Fork on GitHub: click Fork on this repo page (your fork = your workspace)
-# 2) Clone YOUR fork and check out the task branch:
-git clone https://github.com/<YOU>/RubbishRAG_InterviewTakeHome.git
+# 1) Clone your fork and create your solution branch:
+git clone https://github.com/<YOUR-USERNAME>/RubbishRAG_InterviewTakeHome.git
 cd RubbishRAG_InterviewTakeHome
-git checkout candidate              # task branch: minimal files, sealed eval
 git checkout -b solution/<your-github-username>
-python3 --version                   # must be 3.11.x (sealed bytecode requirement)
+
+# 2) Environment setup (Python 3.11 required):
+python3 --version                   # Must be 3.11.x (sealed bytecode requirement)
 pip install -r requirements.txt
 ```
 
 ```bash
-# 3) meet the rubbish (first run asks name/email/GitHub for the report card)
+# 3) Meet the system (first run prompts for candidate identity):
 python3 rubbish.py salam
 python3 rubbish.py bepar "رتبه C1 یعنی چی؟" --topk 5
-python3 rubbish.py bench            # -> traces/metrics.json
-python3 rubbish.py bekesh           # -> plots/*.png
-python3 rubbish.py bastesh          # stamps README report + packs submission.zip
+python3 rubbish.py bench            # Evaluates 20 visible queries -> traces/metrics.json
+python3 rubbish.py bekesh           # Generates 4 diagnostic plots in plots/
+python3 rubbish.py chat             # (Bonus) Interactive CLI clarification loop
+python3 rubbish.py ui               # (Bonus) Launches interactive Studio UI at http://localhost:8000
+python3 rubbish.py bastesh          # Stamps README report card + packs submissions/submission.zip
+```
 
-# 4) commit work + plots + README so the report renders, then push:
+```bash
+# 4) Commit your solution, plots, and proof:
 git add rubbish_rag/ docs/PROOF.md plots/ README.md
 git commit -m "RubbishRAG solution"
 git push -u origin solution/<your-github-username>
-# then send submissions/submission.zip (or open a PR from your branch)
 ```
 
-API mode (same black box, Swagger UI to click through):
+> **Note on Local vs. Server Execution:** Everything runs 100% offline out-of-the-box via `python3 rubbish.py`. You do not need to host an external server. However, if you wish to run the FastAPI server with Swagger documentation or Web UI, run:
+> ```bash
+> uvicorn server.app:app --port 8000 --reload
+> # Interactive Web Studio -> http://localhost:8000/ui
+> # Swagger API Documentation -> http://localhost:8000/docs
+> ```
 
+---
+
+## 3. The 10 Planted Faults (Starting Points for Investigation)
+
+The black box and naive pipeline contain 10 deliberate flaws:
+
+| Fault | Component | Description & Expected Remedy |
+|---|---|---|
+| **F1** | Score Fusion | Raw min-max combination `0.5*(bm25/max) + 0.5*(dense/max)` distorts ranking. Replace with client-side **Reciprocal Rank Fusion (RRF)**. |
+| **F2** | BM25 Length Bias | Excessive penalty $b=0.9, k_1=1.2$ penalizes detailed gold answers. Analyze with `plots/length_vs_bm25.png`. |
+| **F3** | Poison Documents | 8 keyword-stuffed fake documents (IDs 9000–9007). Citing a doc ID $\ge 9000$ automatically fails the item. |
+| **F4** | Persian Normalization | Starter `normalize_fa` is a no-op. Fails on Persian/Arabic digits (`۲۵۰` vs `250`), Arabic characters (`ي/ك/ة`), and half-spaces (`\u200c`). |
+| **F5** | Blind Chunking | Fixed 300-char slices discard question metadata, categories, and split sentences mid-number. |
+| **F6** | Word-Overlap Trap | Naive reranker (`len(q & toks)`) favors repetitive spam over distinctive entities. |
+| **F7** | Resolver Never Clarifies | Ambiguous queries (e.g. general "بدهی دارم") score 0% unless routed to `{"status": "clarify", ...}`. |
+| **F8** | Polarity Blindness | Bag-of-words counters fail on negation particles (`نمی‌شود` vs `می‌شود`, `فاقد` vs `دارای`). |
+| **F9** | Context Dilution | Multiple slices from the same document flood the top-$k$ window. Requires document deduplication. |
+| **F10**| Smart Poison Mimics | 10 fake documents (IDs 9100–9109) mimic real answers with 1 flipped number. Grounding against `corpus/test.csv` is required. |
+
+---
+
+## 4. Deliverables & Evaluation
+
+1. **Fixed `rubbish_rag/` Code**: Your implementations for `pipeline.py`, `normalize_fa.py`, `slots.py`, and `orchestrator.py`.
+2. **`docs/PROOF.md`**: Structured evidence report following [`docs/PROOF_template.md`](docs/PROOF_template.md): Symptom → Probe & Trace IDs → Plot → Architectural Decision.
+3. **`submissions/submission.zip`**: Automatically created by `python3 rubbish.py bastesh` (contains code, identity, traces, metrics, plots, and proof with SHA256 integrity check).
+
+### Grading Standards:
+- **Held-out hidden evaluation (~168 queries):** Paraphrases, slot swaps, ambiguous queries, and poison traps.
+- **Passing Bar:** **Hidden Accuracy >65%** and **Clarify Accuracy >50%**.
+- **30-Minute Technical Defense:** Interviewers will ask you to show failing trace IDs from `traces/trace.jsonl` and explain your decision boundaries.
+
+---
+
+## 5. Bonus Features
+
+### 🎨 1. Minimalistic Web Studio UI
+Run `python3 rubbish.py ui` and open [http://localhost:8000/ui](http://localhost:8000/ui):
+- **Live Mode Toggle:** Compare **Naive RubbishRAG** vs **Fixed Orchestrator** side-by-side.
+- **Interactive Clarification Dialog:** Click clarifying options to resolve ambiguous queries in real time.
+- **Retrieval Inspector:** Visual breakdown of BM25, Dense, Fused, and Rerank scores per hit with poison badges.
+
+### 🤖 2. LangChain-Compatible LCEL Orchestrator
+Packaged in [`rubbish_rag/orchestrator.py`](rubbish_rag/orchestrator.py) with standard LangChain Runnable interface:
+```python
+from rubbish_rag.orchestrator import get_orchestrator
+
+orchestrator = get_orchestrator()
+response = orchestrator.invoke("بانک صادرات به رتبه E3 وام میده؟")
+print(response["brief"], response["cites"])
+```
+
+### 💬 3. Terminal Clarification Chat
+Test multi-turn ambiguity resolution in your shell:
 ```bash
-uvicorn server.app:app --port 8000 --reload
-# http://localhost:8000/docs  (try-it-out) · /redoc · /openapi.json
+python3 rubbish.py chat
 ```
 
-```bash
-curl -X POST localhost:8000/retrieve \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"رتبه C1 یعنی چی؟","topk":5,"api_key":"demo-key"}'
+---
+
+## 6. Honor Code
+
+- **Probe, Don't Read `server/`:** All findings and fixes must be supported by logged probes in `traces/trace.jsonl`.
+- **No Hard-coding:** Hidden evaluation queries are variations not present in the visible benchmark. Hard-coding yields low scores by construction.
+- **Quota:** 1,000 `/retrieve` calls per key. Design disciplined probes; do not scrape.
+
+---
+
+## 7. Repository Layout & Multi-Page Documentation
+
+```text
+corpus/test.csv            The 330 credit-scoring QA records
+rubbish_rag/               YOUR code: pipeline, orchestrator, slots, normalizer
+rubbish.py                 CLI toolkit (salam, bepar, bench, bekesh, chat, ui, bastesh)
+server/app.py              API server + Swagger UI + Web Studio playground
+server/visible_bench.json  20 practice benchmark queries
+docs/index.html            GitHub Pages overview & challenge story
+docs/architecture.html     Detailed system architecture & scoring mathematics
+docs/guide.html            Engineering guide: scientific probing & trace analysis
+docs/deliverables.html     Deliverables checklist, grading rubric, defense questions
+docs/ui.html               Interactive Studio & LangChain orchestrator guide
+docs/DECORATORS.md         The pipeline decorator mechanism
+docs/API.md                Endpoint, curl, and client reference
+docs/PROOF_template.md     Evidence template for docs/PROOF.md
 ```
-
-Full endpoint reference: [`docs/API.md`](docs/API.md).
-
-## 3. Symptoms observed so far (starting points, not conclusions)
-
-- Visible bench: **~40%**. Something is wrong in more than one place.
-- Some top-ranked hits look irrelevant to a human reader. Why do they score high?
-- Some queries that differ in one word get the *same* answer. When is that
-  correct, and when is it a merge of two different truths?
-- Some queries arguably have no good answer in the corpus. What does the
-  current resolver do then — and what *should* a production system do?
-- Scores are returned per hit (`bm25`, `dense`, `fused`). Plot their
-  distributions before theorizing: `bekesh` gives you three starters.
-
-TODO for you: turn each symptom into a falsifiable claim, a probe, and a plot.
-`docs/PROOF_template.md` shows the expected shape of that evidence.
-Theoretical background that past candidates found useful is listed at the end
-of `docs/ARCHITECTURE.md` — as *reading pointers*, after you have data.
-
-## 4. Deliverables
-
-1. Fixed `rubbish_rag/` — your decorator overrides. The remote API is not yours to change.
-2. `docs/PROOF.md` — for each change: symptom → probe + trace IDs → plot → decision.
-   Claims without traces do not count.
-3. `submissions/submission.zip` from `bastesh` (code + traces + metrics + plots + proof, hashed).
-
-Hidden evaluation (~170 held-out queries: paraphrases, slot variations, ambiguous
-and out-of-distribution phrasings) measures retrieval hits, clarification
-behaviour and faithfulness. Bar: **accuracy >65%, clarify >50%**, plus a 30-min
-defense of your traces (*"show me the failing trace"* — a pasted solution
-cannot answer that).
-
-## 5. Honor code
-
-- `server/` internals and hidden queries: **probe, don't read**. Findings must
-  come from logged experiments.
-- Full `corpus/test.csv` is yours — but hidden queries are variations you have
-  not seen. Hard-coding answers caps low by construction.
-- Quota: 1000 `/retrieve` calls per key. Design probes; don't scrape.
-
-## 6. Repo layout & docs
-
-```
-corpus/test.csv            the full QA file (inspect freely)
-rubbish_rag/               YOUR code: pipeline + art + TODO stubs
-rubbish.py                 CLI: salam / bepar / bench / bekesh / bastesh
-server/app.py              black-box API + Swagger (use it, don't read it)
-server/visible_bench.json  20 practice queries (with answers, for self-check)
-docs/DECORATORS.md         the decorator mechanism
-docs/DECORATORS.md         the decorator mechanism (English)
-docs/ARCHITECTURE.md       components, data flow, current behavior, reading pointers
-docs/API.md                endpoint + curl + Python client reference
-docs/PROOF_template.md     evidence shape for docs/PROOF.md
-```
-
-Interviewers: the grading rubric, sealed-file list and per-round refresh live
-in the private folder next to this repo (`RubbishRAG_reference_private/`).
-
-## Setting up the API server (for remote/hosted interviews)
-
-Run the black-box API on a VPS so candidates can probe it over the network:
-
-```bash
-git clone https://github.com/AliNikkhah2001/RubbishRAG_InterviewTakeHome.git
-cd RubbishRAG_InterviewTakeHome
-pip install -r requirements.txt
-uvicorn server.app:app --host 0.0.0.0 --port 8000
-```
-
-- **Swagger UI** → `http://<your-ip>:8000/docs` (interactive test page)
-- **ReDoc** → `http://<your-ip>:8000/redoc`
-- **Health check** → `GET /health`
-
-Create per-candidate API keys in `server/_secrets.py` (each key has its own quota counter and trace log). The default `demo-key` works for local testing but should be replaced in production. Full endpoint reference: [`docs/API.md`](docs/API.md).
-
-## GitHub Pages
-
-This repo ships a task instruction page in `docs/index.html` (bilingual Persian/English). To host it:
-
-1. Go to **Settings → Pages** on your GitHub fork
-2. Source: **Deploy from a branch** → `main` → `/docs`
-3. Save — the page appears at `https://<you>.github.io/RubbishRAG_InterviewTakeHome/`
 
 <!-- RUBBISH-REPORT:START -->
 ## 📊 My RubbishRAG Report
 
-_(Empty — run `python3 rubbish.py bastesh` to stamp your card, metrics and diagrams here.)_
+| card | |
+|---|---|
+| Candidate | Test User (@testuser) |
+| Email | test@example.com |
+| Date | 2026-10-06 14:46 UTC |
+
+### Visible bench (20 queries)
+
+| metric | value |
+|---|---|
+| accuracy | 0.3 |
+| answer_acc | 0.3 |
+| latency mean / p50 / p95 (ms) | 9.2 / 9.0 / 10.4 |
+
+![report card](plots/report_card.png)
+![score spread](plots/score_spread.png)
+![length vs bm25](plots/length_vs_bm25.png)
+![repetition vs bm25](plots/repetition_vs_bm25.png)
+
+_Generated by `python3 rubbish.py bastesh`. Commit `plots/` + `README.md` so this renders on your fork._
 <!-- RUBBISH-REPORT:END -->
