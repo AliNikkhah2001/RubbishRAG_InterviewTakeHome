@@ -1,7 +1,7 @@
 """Evaluator: Persian-normalized exact retrieval + clarify scoring.
 
 Used by the CLI bench and POST /submit. No need to open this to complete
-the task — the output contract is documented in docs/README_FA.md.
+the task — the output contract is documented in the README.
 """
 from .fa_norm import normalize_fa_full
 

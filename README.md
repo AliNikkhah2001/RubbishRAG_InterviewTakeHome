@@ -7,9 +7,8 @@
 
 ```
 
-> **رابیـش‌رگ** — مدیر ما می‌گه AI اینو ۱ دقیقه‌ای ساخته! شما به‌عنوان
-> مصاحبه‌شونده باید ثابت کنید اشتباه می‌کند: رفتارش را اندازه بگیرید،
-> خطاهایش را پیدا کنید، و اصلاحش کنید — و برای هر ادعا trace و نمودار بیاورید.
+> **RubbishRAG** — Your boss said AI built this in 1 minute. Prove it wrong.
+> Measure its behavior, find the bugs, fix them — and back every claim with traces and plots.
 
 A take-home for AI engineers: a Persian RAG over real credit-scoring QA that
 *looks* finished and scores **~40% on the visible bench**. Generic AI advice
@@ -147,8 +146,8 @@ rubbish_rag/               YOUR code: pipeline + art + TODO stubs
 rubbish.py                 CLI: salam / bepar / bench / bekesh / bastesh
 server/app.py              black-box API + Swagger (use it, don't read it)
 server/visible_bench.json  20 practice queries (with answers, for self-check)
-docs/README_FA.md          task brief (فارسی)
-docs/DECORATORS_FA.md      the decorator mechanism (فارسی)
+docs/DECORATORS.md         the decorator mechanism
+docs/DECORATORS.md         the decorator mechanism (English)
 docs/ARCHITECTURE.md       components, data flow, current behavior, reading pointers
 docs/API.md                endpoint + curl + Python client reference
 docs/PROOF_template.md     evidence shape for docs/PROOF.md

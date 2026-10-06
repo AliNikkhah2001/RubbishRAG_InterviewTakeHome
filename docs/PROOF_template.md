@@ -1,14 +1,14 @@
-# PROOF.md — قالب اثبات (به‌ازای هر تغییر، یک بخش مثل زیر)
+# PROOF.md — evidence template (one section per change)
 
-> بدون probe واقعی و شناسه trace = مردود. حداکثر چند صفحه، نه بیشتر.
+> No logged traces = rejected. Max a few pages, not more.
 
-## تغییر ۱: <نام تغییر، مثلاً «chunker»>
+## Change 1: <name, e.g. "chunker">
 
-- **علامت:** <چه دیدید؟ کدام کوئری/سند؟>
-- **پروب‌ها:** <دستورهای `bepar` + شناسه traceها در `traces/trace.jsonl`>
-- **نمودار:** <کدام PNG و چه نشان می‌دهد؟>
-- **تصمیم:** <چه کردید و چرا؟ چه چیزی را امتحان کردید که جواب نداد؟>
+- **Symptom:** <what did you see? which query/doc?>
+- **Probes:** <`bepar` commands + trace IDs from `traces/trace.jsonl`>
+- **Plot:** <which PNG and what it shows?>
+- **Decision:** <what you did and why. What did you try that didn't work?>
 
-## تغییر ۲: <...>
+## Change 2: <...>
 
-(به همین ترتیب برای هر تغییر. در پایان: چه چیزی را عمداً دست نزدید و چرا؟)
+(Same format for each change. End with: what did you deliberately NOT touch and why?)

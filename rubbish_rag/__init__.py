@@ -1,6 +1,6 @@
 """RubbishRAG — decorator registry.
 
-مدیر ما می‌گه AI اینو ۱ دقیقه‌ای ساخته! شما ثابت کنید اشتباه می‌کنه.
+Your boss said AI built this in 1 minute. Prove it wrong.
 
 Candidate overrides any stage by re-registering:
 

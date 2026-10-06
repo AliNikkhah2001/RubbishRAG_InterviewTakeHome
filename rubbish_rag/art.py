@@ -57,6 +57,6 @@ LOGO_LONG = r"""
                     ..
 """
 
-BANNER_FA = "رابیـش‌رگ :: مدیر ما می‌گه AI اینو ۱ دقیقه‌ای ساخته! شما ثابت کنید اشتباه می‌کنه."
+BANNER_FA = "RubbishRAG :: Your boss said AI built this in 1 minute. Prove it wrong."
 
 DIVIDER = "=" * 64

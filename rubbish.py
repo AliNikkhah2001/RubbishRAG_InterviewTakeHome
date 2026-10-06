@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""RubbishRAG CLI — تنها ابزار رسمی شما.
+"""RubbishRAG CLI — your only tool.
 
-مدیر ما می‌گه AI اینو ۱ دقیقه‌ای ساخته! شما ثابت کنید اشتباه می‌کنه.
+Your boss said AI built this in 1 minute. Prove it wrong.
 
-Commands (funny names, serious bench):
+Commands:
   salam    — check key + quota
-  bepar    — single probe:  rubbish bepar "رتبه C یعنی چی؟" --topk 5
+  bepar    — single probe:  rubbish bepar "سوال چی؟" --topk 5
   bench    — run visible bench (20 queries), save metrics.json
-  bekesh   — plot score/length/repetition patterns from your logs
+  rapchik  — generate diagnostic plots from your logs
   bastesh  — stamp README report card + pack submission.zip
              (code + identity + traces + metrics + plots + PROOF.md)
 """
@@ -59,10 +59,9 @@ def _quota(key):
 
 def cmd_salam(args):
     print(LOGO)
-    print(f"سلام! کلید شما: {args.key}")
-    print(f"مصرف /retrieve تاکنون: {_quota(args.key)} / 1000")
-    print("داده: corpus/test.csv (کامل، همین فایل نمونه)")
-    print("شروع: rubbish bepar \"رتبه C یعنی چی؟\"")
+    print(f"Key: {args.key} | Quota used: {_quota(args.key)} / 1000")
+    print("Corpus: corpus/test.csv (full copy, all ~440 rows)")
+    print("Start: rubbish bepar \"رتبه C یعنی چی؟\"")
 
 
 def cmd_bepar(args):
@@ -119,7 +118,7 @@ def cmd_bench(args):
     agg, _ = _run_bench(args.key)
     print("pipe=naive (RubbishRAG)")
     print(json.dumps(agg, ensure_ascii=False, indent=1))
-    print("ذخیره شد: traces/metrics.json (لاگ هر probe در traces/trace.jsonl)")
+    print("Saved: traces/metrics.json (every probe logged in traces/trace.jsonl)")
 
 
 def cmd_bekesh(args):
@@ -172,9 +171,9 @@ def cmd_bekesh(args):
     plt.title("Mean BM25: repetitive vs other hits")
     plt.savefig(os.path.join(BASE, "plots", "repetition_vs_bm25.png"))
     plt.close()
-    print("ساخته شد: plots/score_spread.png plots/length_vs_bm25.png "
+    print("Generated: plots/score_spread.png plots/length_vs_bm25.png "
           "plots/repetition_vs_bm25.png")
-    print("این‌ها نقطه شروع‌اند — نمودارهای خودتان را هم بسازید و در PROOF.md تفسیر کنید.")
+    print("These are starting points — make your own diagrams and interpret them in PROOF.md.")
     _write_report_card(plt)
 
 
@@ -214,7 +213,7 @@ def _write_report_card(plt):
     fig.tight_layout()
     fig.savefig(os.path.join(BASE, "plots", "report_card.png"))
     plt.close(fig)
-    print("ساخته شد: plots/report_card.png (کارنامه عملکرد شما)")
+    print("Generated: plots/report_card.png (your performance report card)")
 
 
 def write_report_section():
@@ -286,12 +285,12 @@ def cmd_bastesh(args):
             z.write(proof, "docs/PROOF.md")
         elif os.path.exists(tmpl):
             z.write(tmpl, "docs/PROOF.md")
-            print("هشدار: docs/PROOF.md ندارید — template خام بسته شد. آن را بنویسید!")
+            print("Warning: no docs/PROOF.md found — packed template instead. Write it!")
         mani = {"key": args.key, "quota_used": _quota(args.key)}
         z.writestr("manifest.json", json.dumps(mani, ensure_ascii=False))
     h = hashlib.sha256(open(out, "rb").read()).hexdigest()[:16]
-    print(f"بسته شد: {out}  sha={h}")
-    print("همین فایل را ارسال کنید. دست‌کاری بعدی قابل تشخیص است.")
+    print(f"Packed: {out}  sha={h}")
+    print("Submit this file. Tampering is detectable.")
 
 
 def main():

@@ -1,7 +1,7 @@
 """RubbishRAG pipeline — the 1-minute version.
 
 Stages (override any of them with @rubbish_rag.* decorators —
-see docs/DECORATORS_FA.md for the mechanism):
+see docs/DECORATORS.md for the mechanism):
   chunk -> retrieve (remote) -> rerank -> resolve
 """
 import rubbish_rag as R
@@ -65,7 +65,7 @@ def resolve(query, hits):
 
     TODO: what should happen when the top hits contradict each other, or when
     the query itself is missing the one detail the answer depends on?
-    Check the output contract in docs/README_FA.md, then decide.
+    Check the output contract in the README, then decide.
     """
     _ = extract_slots_broken(query)  # currently unused
     top = hits[0] if hits else {"text": "", "doc_id": -1}
