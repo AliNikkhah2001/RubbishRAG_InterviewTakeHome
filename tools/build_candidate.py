@@ -51,6 +51,7 @@ ALLOW = [
     "docs/ARCHITECTURE.md",
     "docs/API.md",
     "docs/PROOF_template.md",
+    "docs/index.html",
 ]
 
 SEALED = [
