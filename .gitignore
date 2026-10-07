@@ -6,12 +6,7 @@ traces/quota.json
 traces/metrics.json
 traces/submissions.jsonl
 submissions/*.zip
-plots/*.png
-.candidate.json
 server/hidden_eval.json
-server/hidden_eval.enc
 server/server_index.json
-# sealed: reference fix + answer-key runner must never be committed
-reference_solution/
-run_validation.py
+.candidate.json
 .DS_Store
