@@ -237,6 +237,8 @@ pre code {
 }
 .badge-primary { background: var(--primary-light); color: var(--primary); }
 .badge-danger { background: rgba(225, 29, 72, 0.15); color: var(--accent); }
+.badge-warning { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+.badge-success { background: rgba(16, 185, 129, 0.15); color: #059669; }
 
 .callout {
   border-left: 4px solid var(--primary);

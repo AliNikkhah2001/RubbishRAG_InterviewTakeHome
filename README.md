@@ -12,172 +12,247 @@
   ╚═════════════════════════════════════════════════════════════════╝
 ```
 
-> **RubbishRAG** — Your boss claimed an AI built this Persian credit-scoring RAG in 1 minute. Prove them wrong.
-> Measure its behavior, diagnose the root causes, fix the pipeline stages — and back every claim with logged traces and empirical plots.
+> **RubbishRAG** is a senior-level take-home engineering challenge centered on a retrieval-augmented generation (RAG) system for Persian credit-scoring regulations ([`corpus/test.csv`](corpus/test.csv), 330 verified QA pairs).
+> 
+> The story: an internal team claimed they built a production-ready Persian RAG in 1 minute using off-the-shelf AI. On the surface, the pipeline runs and returns answers. Under rigorous evaluation, **it achieves only ~25–30% accuracy on the visible benchmark**, suffers from rank distortions, falls for distractor documents, and hallucinates answers on ambiguous inputs.
+>
+> Your mission is to systematically probe the system, diagnose failure modes with empirical telemetry, implement principled engineering solutions in candidate-editable code, and defend your architectural choices with logged traces and ablation data.
 
-A take-home interview challenge for **AI / ML / RAG Engineers**: a Persian retrieval-augmented generation system over real credit-scoring QA ([`corpus/test.csv`](corpus/test.csv), 330 verified QA pairs) that *looks* finished on the surface, but scores only **~25–30% on the visible benchmark**. 
-
-Generic AI advice (tuned for English frontier models) fails here. The bugs are grounded inside Persian script variation, flawed score fusion, aggressive length penalties, server-injected poison documents, and ungrounded resolvers. AI assistants are permitted; **systematic engineering and empirical data are required**.
-
-📖 **Full Multi-Page Documentation:** Hosted on [GitHub Pages](https://alinikkhah2001.github.io/RubbishRAG_InterviewTakeHome/) (or browse locally in [`docs/index.html`](docs/index.html)).
+📖 **Comprehensive Documentation:** Hosted on [GitHub Pages](https://alinikkhah2001.github.io/RubbishRAG_InterviewTakeHome/) (or browse locally in [`docs/index.html`](docs/index.html)).
 
 ---
 
-## 1. System Architecture & Data Flow
+## 1. System Architecture & Information Boundaries
 
 ```text
-corpus/test.csv  (330 Persian Credit-Scoring QA Pairs: Question | Category | BriefAnswer | Answer | Keyword)
-       │
-       ▼
-┌──────────────┐  rubbish_rag/pipeline.py              ┌─────────────────────────────────┐
-│ @chunker     │  Fixed 300-char splits of Answer      │  BLACK BOX (server/)            │
-│      ────────┼─────────────────────────────────────▶ │  POST /retrieve                 │
-│ @retriever   │  Forwards raw query, top-k hits       │  Computes BM25, Dense & Fused   │
-│ @reranker    │  Orders by shared-word count          │  Returns hits with scores       │
-│ @resolver    │  Answers from top hits                └─────────────────────────────────┘
-└──────────────┘                                                       │ Quota: 1000 calls/key
-       │                                                               ▼ Logged in trace.jsonl
-       ▼
-answer {"status":"answer","brief":"...","cites":[...]}  OR  clarify {"status":"clarify","question":"...","options":[...]}
+  User Query (Persian Credit Scoring)
+                 │
+                 ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ CANDIDATE-EDITABLE PIPELINE (rubbish_rag/)                      │
+  │                                                                 │
+  │  [Query Normalizer]       Canonicalize script, digits, ZWNJ     │
+  │  [Entity & Slot Guard]    Detect banks, rank codes (A1..E3)     │
+  │  [Decision Judge]         Pre-retrieval route: Answer vs Clarify│
+  │                                                                 │
+  │  ┌──────────────┐         Calls sealed retrieval endpoint       │
+  │  │ @retriever   │ ──────────────────────────────────────────┐   │
+  │  └──────────────┘                                           │   │
+  │  ┌──────────────┐                                           │   │
+  │  │ @reranker    │ ◀─── Reranks candidates, filters traps    │   │
+  │  └──────────────┘                                           │   │
+  │  ┌──────────────┐                                           │   │
+  │  │ @resolver    │ ───▶ Structured answer or clarification   │   │
+  │  └──────────────┘                                           │   │
+  └─────────────────────────────────────────────────────────────┼───┘
+                                                                │
+                                    Quota: 1000 calls/key       ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ SEALED SERVER INTERFACE (server/)                               │
+  │   POST /retrieve                                                │
+  │   - Computes BM25, Dense similarity, and raw fused scores       │
+  │   - Returns candidate hits with scores and document metadata    │
+  │   - Governed by the Honor Code (Inspect via API probes only)    │
+  └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Components:
-- **`rubbish_rag/pipeline.py`**: Four decorator stages (`@chunker`, `@retriever`, `@reranker`, `@resolver`). Override any stage by registering your improved functions.
-- **`rubbish_rag/normalize_fa.py` & `slots.py`**: Persian normalization and entity slot extraction utilities.
-- **`rubbish_rag/orchestrator.py`**: **(Bonus)** End-to-end production orchestrator with Reciprocal Rank Fusion, poison penalty, and dynamic clarification.
-- **`server/`**: **Sealed under the honor code** (see §5). Answers `/retrieve` and computes scores. Every hit carries `bm25`, `dense`, and `fused` scores. Do not read server internals; probe them.
-- **`corpus/test.csv`**: The ground-truth credit scoring dataset (330 distinct questions and answers).
-- **`rubbish.py`**: Candidate CLI toolkit: `salam` (status), `bepar` (single probe), `bench` (visible benchmark), `bekesh` / `rapchik` (plots), `chat` (interactive clarification loop), `ui` (web playground), and `bastesh` (submission packager).
+### Information Boundaries & Honor Code
+- **Candidate-Editable (`rubbish_rag/`):** You have full ownership of `pipeline.py`, `normalize_fa.py`, `slots.py`, `judge.py`, and `orchestrator.py`. Write clean, typed, modular Python.
+- **Sealed Evaluator (`server/`):** The server models a proprietary backend service. Do not inspect compiled bytecode or reverse-engineer private files. Probe the API via `python3 rubbish.py bepar` or HTTP requests, observe returned scores, and log empirical traces.
+- **Ground Truth Corpus (`corpus/test.csv`):** 330 verified QA records from the Iranian Credit Scoring regulations.
+- **Reproducibility:** The entire challenge runs **100% locally and offline on CPU** in `< 15ms` per query. No GPUs, external API keys, or paid cloud services are required.
 
 ---
 
-## 2. Quickstart
+## 2. 5-Minute Quickstart
 
-Work on a GitHub fork of this repository:
+### Prerequisites
+- **Python 3.11.x** (Required for sealed server runtime compatibility)
+- Standard developer environment (`macOS`, `Linux`, or `WSL`)
 
 ```bash
-# 1) Clone your fork and create your solution branch:
+# 1) Clone your fork and set up virtual environment
 git clone https://github.com/<YOUR-USERNAME>/RubbishRAG_InterviewTakeHome.git
 cd RubbishRAG_InterviewTakeHome
-git checkout -b solution/<your-github-username>
+python3 -m venv venv
+source venv/bin/activate
 
-# 2) Environment setup (Python 3.11 required):
-python3 --version                   # Must be 3.11.x (sealed bytecode requirement)
+# 2) Install dependencies
 pip install -r requirements.txt
-```
 
-```bash
-# 3) Meet the system (first run prompts for candidate identity):
+# 3) Verify installation & run test suite
+pytest tests/
 python3 rubbish.py salam
-python3 rubbish.py bepar "رتبه C1 یعنی چی؟" --topk 5
-python3 rubbish.py bench            # Evaluates 20 visible queries -> traces/metrics.json
-python3 rubbish.py bekesh           # Generates 4 diagnostic plots in plots/
-python3 rubbish.py chat             # (Bonus) Interactive CLI clarification loop
-python3 rubbish.py ui               # (Bonus) Launches interactive Studio UI at http://localhost:8000
-python3 rubbish.py bastesh          # Stamps README report card + packs submissions/submission.zip
 ```
+
+### Core CLI Workflow
+```bash
+# Probe a single query and inspect raw retrieval sub-scores
+python3 rubbish.py bepar "رتبه اعتباری B2 چیست؟" --topk 5
+
+# Evaluate the visible benchmark (20 diverse queries)
+python3 rubbish.py bench
+
+# Compare baseline against your improved pipeline
+python3 rubbish.py compare
+
+# Inspect a specific execution trace by ID or keyword
+python3 rubbish.py inspect-trace trace_20261007_120000_0
+
+# Generate diagnostic evaluation plots
+python3 rubbish.py bekesh
+
+# (Staff Track) Benchmark the Adaptive System-1 Decision Judge
+python3 rubbish.py judge-bench
+
+# Package your submission (stamps README scorecard + builds submission.zip)
+python3 rubbish.py bastesh
+```
+
+---
+
+## 3. 3-Tier Task Architecture & Expected Scope
+
+To respect your time and provide clear boundaries, the challenge is structured into three tiers. Choose your path based on your role focus and target level:
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│ 1. REQUIRED CORE (~3–4 Hours) — Every Candidate Completes              │
+│    Task 1: Scientific Diagnosis & Evidence (PROOF.md + Traces)         │
+│    Task 2: Persian Normalization & Robust Retrieval                    │
+│    Task 3: Faithful Answer Resolution & Clarification Guardrails       │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 2. CHOOSE-2 ELECTIVES (~2 Hours) — Select Exactly Two                  │
+│    Elective A: Entity-Aware Slot Reranking (Bank & Rank Sensitivity)   │
+│    Elective B: Defensive Filtering Against Distractors & Poison Docs   │
+│    Elective C: Observability & Diagnostics Tooling (CLI & Telemetry)   │
+│    Elective D: LangChain LCEL Pipeline Orchestration                   │
+│    Elective E: Interactive Web Studio & Latency Profiling              │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ 3. STAFF TRACK BONUS (+20% Bonus) — Optional Senior / Staff Extension │
+│    Adaptive System-1 Decision Judge (Self-RAG / CRAG / Adaptive-RAG)   │
+│    Pre-retrieval routing, dynamic-k stopping policy, calibration (ECE) │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+See [`docs/tasks.html`](docs/tasks.html) for detailed task specifications and acceptance criteria.
+
+---
+
+## 4. Diagnostic Probing & Observable Symptoms
+
+Rather than reading internal server source code, practice scientific AI engineering: formulate hypotheses and design targeted probes. Look for these observable symptoms:
+
+1. **Persian Script Drift:** Queries containing Arabic characters (`ي`, `ك`), Persian/Arabic digits (`۱۲۳`), or missing Zero-Width Non-Joiners (ZWNJ) yield 0 BM25 term matches on relevant documents.
+2. **Entity Inversion:** Inverting bank names (e.g. *بانک صادرات* vs *بانک ملی*) or rank grades (*A1* vs *E3*) fails to demote irrelevant hits due to unweighted bag-of-words scoring.
+3. **Score Scale Distortion:** Outlier scores in sparse or dense retrievers distort naive linear combinations (`0.5 * bm25 + 0.5 * dense`), crowding out truly relevant hits.
+4. **Length Bias:** Sparse scoring severely penalizes longer, informative credit scoring clauses in favor of short, terse fragments.
+5. **Adversarial Distractors:** Keyword-stuffed or synthetic distractor documents outrank legitimate regulatory documents.
+6. **Hallucination on Ambiguity:** Underspecified queries (e.g., *«بدهی دارم»* — loan debt vs tax lien vs bounced check) receive confident, incorrect answers instead of asking clarifying questions.
+
+---
+
+## 5. Staff Track: Adaptive System-1 Decision Judge
+
+For candidates targeting Senior and Staff AI Engineer roles, RubbishRAG includes a major architecture track inspired by **Self-RAG**, **Adaptive-RAG**, and **Corrective RAG (CRAG)**:
+
+- **Module:** [`rubbish_rag/judge.py`](rubbish_rag/judge.py)
+- **Concept:** A fast, low-latency "System-1" decision model that evaluates queries and retrieved evidence before and after retrieval.
+- **Capabilities:**
+  - **Pre-retrieval routing:** Decides whether retrieval is necessary (`DIRECT_ANSWER`), whether clarification is mandatory (`CLARIFY`), or whether retrieval is required (`RETRIEVE`).
+  - **Dynamic $k$ selection:** Adapts retrieval depth based on query complexity.
+  - **Evidence sufficiency evaluation:** Decides whether retrieved chunks are sufficient to answer, require query reformulation, or warrant abstention.
+  - **Probability Calibration:** Computes Brier Score and Expected Calibration Error (ECE) to ensure confidence scores are reliable.
+  - **Evaluation Dataset:** 50 diverse Persian credit queries in [`data/judge_dataset.json`](data/judge_dataset.json).
 
 ```bash
-# 4) Commit your solution, plots, and proof:
-git add rubbish_rag/ docs/PROOF.md plots/ README.md
-git commit -m "RubbishRAG solution"
-git push -u origin solution/<your-github-username>
+# Run judge on a single query
+python3 rubbish.py judge "رتبه C2 چه شرایطی دارد؟"
+
+# Benchmark routing accuracy, calibration, and token savings
+python3 rubbish.py judge-bench
 ```
 
-> **Note on Local vs. Server Execution:** Everything runs 100% offline out-of-the-box via `python3 rubbish.py`. You do not need to host an external server. However, if you wish to run the FastAPI server with Swagger documentation or Web UI, run:
-> ```bash
-> uvicorn server.app:app --port 8000 --reload
-> # Interactive Web Studio -> http://localhost:8000/ui
-> # Swagger API Documentation -> http://localhost:8000/docs
-> ```
+Read the full architecture and state machine specifications in [`docs/adaptive-judge.html`](docs/adaptive-judge.html).
 
 ---
 
-## 3. Observed Failure Modes & Investigation Areas
+## 6. Deliverables & Evaluation Rubric
 
-When probing the baseline pipeline and retrieval scores, pay attention to these 10 distinct failure modes and architectural challenges:
+Your final submission must include:
+1. **Pipeline Implementation:** Clean, modular overrides in `rubbish_rag/`.
+2. **Evidence Report (`docs/PROOF.md`):** Complete report following [`docs/PROOF_template.md`](docs/PROOF_template.md), linking each change to exact trace IDs and ablation figures.
+3. **Signed Archive (`submissions/submission.zip`):** Generated by `python3 rubbish.py bastesh` with automated SHA256 manifest.
 
-| Area | Component | Observed Failure Mode & Investigation Goal |
-|---|---|---|
-| **1. Score Fusion** | Retrieval | The naive min-max scaling `0.5*(bm25/max) + 0.5*(dense/max)` can distort relative rankings when outliers occur. Investigate rank-based fusion (such as Reciprocal Rank Fusion). |
-| **2. Length Bias** | Sparse Retrieval | Document length penalty parameters can overly penalize thorough, informative answers. Use `plots/length_vs_bm25.png` to analyze length distributions. |
-| **3. Adversarial / Poison Documents** | Corpus & Reranking | Spurious or keyword-stuffed documents exist in the index (doc IDs &ge; 9000). Ensure your pipeline filters or demotes unverified documents. |
-| **4. Persian Script Variations** | Normalization | Variations in Persian/Arabic digits (`۲۵۰` vs `250`), Arabic characters (`ي/ك/ة`), and half-spaces (`\u200c`) degrade text match rates. Implement robust text canonicalization. |
-| **5. Chunking Strategy** | Chunker | Fixed-width character chunking severs entity names, category metadata, and numerical thresholds. Design boundary- and metadata-aware chunking. |
-| **6. Reranking Sensitivity** | Reranker | Naive bag-of-words overlap favors repetitive keyword stuffing over specific entity matches. Incorporate domain entity awareness and term importance. |
-| **7. Ambiguity Resolution** | Resolver | Underspecified queries (such as generic credit status questions) lack necessary parameters. Implement dynamic clarification to request missing details. |
-| **8. Polarity & Negation** | Semantic Matching | Unigrams often fail to distinguish opposing polarity (e.g. `می‌شود` vs `نمی‌شود`). Account for negation indicators during scoring. |
-| **9. Context Redundancy** | Deduplication | Slices from identical documents can crowd top-k retrieval windows. Implement deduplication to maximize evidence diversity. |
-| **10. Fact Verification** | Grounding | Subtle factual variations across documents can mislead generators. Ground retrieval against verified reference entries in `corpus/test.csv`. |
-
----
-
-## 4. Deliverables & Evaluation
-
-1. **Fixed `rubbish_rag/` Code**: Your implementations for `pipeline.py`, `normalize_fa.py`, `slots.py`, and `orchestrator.py`.
-2. **`docs/PROOF.md`**: Structured evidence report following [`docs/PROOF_template.md`](docs/PROOF_template.md): Symptom → Probe & Trace IDs → Plot → Architectural Decision.
-3. **`submissions/submission.zip`**: Automatically created by `python3 rubbish.py bastesh` (contains code, identity, traces, metrics, plots, and proof with SHA256 integrity check).
-
-### Grading Standards:
-- **Held-out hidden evaluation (~168 queries):** Paraphrases, slot swaps, ambiguous queries, and poison traps.
-- **Technical Discussion:** In the follow-up technical discussion, be prepared to walk through your diagnostic process, key findings from `traces/trace.jsonl`, and the empirical trade-offs behind your decisions.
-
----
-
-## 5. Bonus Features
-
-### 🎨 1. Minimalistic Web Studio UI
-Run `python3 rubbish.py ui` and open [http://localhost:8000/ui](http://localhost:8000/ui):
-- **Live Mode Toggle:** Compare **Naive RubbishRAG** vs **Fixed Orchestrator** side-by-side.
-- **Interactive Clarification Dialog:** Click clarifying options to resolve ambiguous queries in real time.
-- **Retrieval Inspector:** Visual breakdown of BM25, Dense, Fused, and Rerank scores per hit with poison badges.
-
-### 🤖 2. LangChain-Compatible LCEL Orchestrator
-Packaged in [`rubbish_rag/orchestrator.py`](rubbish_rag/orchestrator.py) with standard LangChain Runnable interface:
-```python
-from rubbish_rag.orchestrator import get_orchestrator
-
-orchestrator = get_orchestrator()
-response = orchestrator.invoke("بانک صادرات به رتبه E3 وام میده؟")
-print(response["brief"], response["cites"])
-```
-
-### 💬 3. Terminal Clarification Chat
-Test multi-turn ambiguity resolution in your shell:
-```bash
-python3 rubbish.py chat
-```
-
----
-
-## 6. Honor Code
-
-- **Probe, Don't Read `server/`:** All findings and fixes must be supported by logged probes in `traces/trace.jsonl`.
-- **No Hard-coding:** Hidden evaluation queries are variations not present in the visible benchmark. Hard-coding yields low scores by construction.
-- **Quota:** 1,000 `/retrieve` calls per key. Design disciplined probes; do not scrape.
+### 7-Dimension Grading Rubric (100 Points + 20 Bonus)
+- **1. Problem Diagnosis & Scientific Methodology (20%):** Hypothesis formulation, disciplined probing, trace-backed reasoning.
+- **2. Retrieval Precision & IR Correctness (20%):** Persian normalization, entity sensitivity, score fusion, distractor resilience.
+- **3. Answer Quality & Guardrails (15%):** Grounded brief answers, structured clarification on ambiguity, defensive abstention.
+- **4. Software Architecture & Code Quality (15%):** Modular design, typing, testability, latency `< 100ms` on CPU.
+- **5. Observability & Diagnostics (10%):** Trace structure, sub-score logging, inspection CLI tools.
+- **6. Testing Rigor & Reproducibility (10%):** Unit tests in `tests/`, deterministic execution, clean CI.
+- **7. Documentation & Communication (10%):** Crisp `docs/PROOF.md`, clear trade-off explanations.
+- **Bonus Tracks (+20%):** Adaptive System-1 Judge, LangChain LCEL orchestrator, or Web Studio playground.
 
 ---
 
 ## 7. Repository Layout & Multi-Page Documentation
 
 ```text
-corpus/test.csv            The 330 credit-scoring QA records
-rubbish_rag/               YOUR code: pipeline, orchestrator, slots, normalizer
-rubbish.py                 CLI toolkit (salam, bepar, bench, bekesh, chat, ui, bastesh)
-server/app.py              API server + Swagger UI + Web Studio playground
-server/visible_bench.json  20 practice benchmark queries
-docs/index.html            GitHub Pages overview & challenge story
-docs/architecture.html     Detailed system architecture & scoring mathematics
-docs/guide.html            Engineering guide: scientific probing & trace analysis
-docs/deliverables.html     Deliverables checklist, grading rubric, and presentation guide
-docs/ui.html               Interactive Studio & LangChain orchestrator guide
-docs/DECORATORS.md         The pipeline decorator mechanism
-docs/API.md                Endpoint, curl, and client reference
-docs/PROOF_template.md     Evidence template for docs/PROOF.md
+corpus/test.csv               330 Persian Credit-Scoring QA Records
+data/judge_dataset.json       50 Annotated Queries for Adaptive Decision Judge
+rubbish_rag/                  Candidate Codebase
+├── pipeline.py               Decorator-based pipeline stages (@chunker, @retriever, etc.)
+├── normalize_fa.py           Persian text & digit canonicalization
+├── slots.py                  Domain entity & slot extraction (banks, ranks, debts)
+├── judge.py                  Adaptive System-1 Decision Judge & calibration
+└── orchestrator.py           LangChain LCEL-compatible production pipeline
+rubbish.py                    Candidate CLI toolkit (11 subcommands)
+server/                       Sealed Evaluator & Retrieval Server (Honor Code)
+tests/                        Automated test suite (pytest)
+docs/                         Multi-Page Documentation Suite
+├── index.html                Overview & Challenge Story
+├── tasks.html                3-Tier Task Architecture & Specifications
+├── architecture.html         Dual Pipeline Architecture & Scoring Math
+├── adaptive-judge.html       Staff Track: Adaptive System-1 Decision Judge
+├── guide.html                Engineering Guide: Scientific Probing & Traces
+├── deliverables.html         Deliverables Checklist & 7-Dimension Rubric
+├── glossary.html             Metrics Glossary (IR, Calibration, Latency)
+├── ui.html                   Interactive Web Studio & Orchestrator Guide
+├── CHALLENGE_AUDIT.md        Comprehensive Pre-Edit Challenge Audit
+├── CHALLENGE_CHANGELOG.md    Challenge Evolution & Decision Log
+└── PROOF_template.md         Hypothesis-Driven Evidence Report Template
 ```
+
+---
 
 <!-- RUBBISH-REPORT:START -->
 ## 📊 My RubbishRAG Report
 
-_(Empty — run `python3 rubbish.py bastesh` to stamp your candidate card, metrics, and diagrams here.)_
+| card | |
+|---|---|
+| Candidate | Test User (@testuser) |
+| Email | test@example.com |
+| Date | 2026-10-07 12:32 UTC |
+
+### Visible bench (20 queries)
+
+| metric | value |
+|---|---|
+| accuracy | 0.3 |
+| answer_acc | 0.3 |
+| latency mean / p50 / p95 (ms) | 9.6 / 9.5 / 11.1 |
+
+![report card](plots/report_card.png)
+![score spread](plots/score_spread.png)
+![length vs bm25](plots/length_vs_bm25.png)
+![repetition vs bm25](plots/repetition_vs_bm25.png)
+
+_Generated by `python3 rubbish.py bastesh`. Commit `plots/` + `README.md` so this renders on your fork._
 <!-- RUBBISH-REPORT:END -->

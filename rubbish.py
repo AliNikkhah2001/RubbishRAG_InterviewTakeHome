@@ -349,6 +349,97 @@ def cmd_ui(args):
         sys.exit("Error: uvicorn is required for web UI. Run `pip install -r requirements.txt`.")
 
 
+def cmd_judge(args):
+    print(LOGO)
+    from rubbish_rag.judge import HeuristicFeatureJudge
+    judge = HeuristicFeatureJudge()
+    pre = judge.pre_retrieval(args.query)
+    print("=== [System-1 Pre-Retrieval Decision] ===")
+    print(json.dumps(pre.to_dict(), ensure_ascii=False, indent=2))
+    if pre.needs_retrieval:
+        from server._hidden_retriever import remote_retrieve
+        hits = remote_retrieve(args.query, topk=pre.top_k, api_key=args.key)
+        post = judge.post_retrieval(args.query, hits)
+        print("\n=== [Post-Retrieval Evidence Assessment] ===")
+        print(json.dumps(post.to_dict(), ensure_ascii=False, indent=2))
+
+
+def cmd_judge_bench(args):
+    print(LOGO)
+    from rubbish_rag.judge import evaluate_judge
+    print(f"Evaluating System-1 RAG Decision Judge (split={args.split or 'all'})...\n")
+    metrics = evaluate_judge(split=args.split)
+    print("=" * 55)
+    print("      SYSTEM-1 RAG DECISION JUDGE BENCHMARK      ")
+    print("=" * 55)
+    print(f"Total Queries:         {metrics.get('total_queries')}")
+    print(f"Routing Accuracy:      {metrics.get('routing_accuracy', 0) * 100:.1f}%")
+    cla = metrics.get("clarification", {})
+    print(f"Clarify Precision:     {cla.get('precision', 0) * 100:.1f}%")
+    print(f"Clarify Recall:        {cla.get('recall', 0) * 100:.1f}%")
+    print(f"Clarify F1:            {cla.get('f1', 0):.3f}")
+    budget = metrics.get("context_budget", {})
+    print(f"Mean Dynamic top-k:    {budget.get('mean_top_k')} (Baseline: 5)")
+    print(f"Context Token Savings: {budget.get('token_savings_pct')}%")
+    cal = metrics.get("calibration", {})
+    print(f"Brier Score:           {cal.get('brier_score')}")
+    print(f"Expected Calib Error:  {cal.get('expected_calibration_error')}")
+    print("=" * 55)
+
+
+def cmd_inspect_trace(args):
+    print(LOGO)
+    trace_file = os.path.join(BASE, "traces", "trace.jsonl")
+    if not os.path.exists(trace_file):
+        print("Error: traces/trace.jsonl not found.")
+        return
+    target = str(args.trace_id)
+    found = []
+    with open(trace_file, encoding="utf-8") as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            if target in line or target == str(line_num):
+                try:
+                    found.append(json.loads(line))
+                except Exception:
+                    pass
+    if not found:
+        print(f"No trace found matching ID or query '{target}'.")
+        return
+    print(f"Found {len(found)} matching trace(s):")
+    for t in found[:3]:
+        print(json.dumps(t, ensure_ascii=False, indent=2))
+
+
+def cmd_compare(args):
+    print(LOGO)
+    f1, f2 = args.file1, args.file2
+    if not os.path.exists(f1) or not os.path.exists(f2):
+        print(f"Error: One or both files not found: {f1}, {f2}")
+        return
+    try:
+        m1 = json.load(open(f1, encoding="utf-8")).get("agg", {})
+        m2 = json.load(open(f2, encoding="utf-8")).get("agg", {})
+    except Exception as e:
+        print(f"Error reading metrics JSON: {e}")
+        return
+    name1 = os.path.basename(f1)
+    name2 = os.path.basename(f2)
+    print(f"{'Metric':<25} | {name1:<20} | {name2:<20} | {'Delta':<10}")
+    print("-" * 82)
+    for k in ["accuracy", "answer_acc", "clarify_acc"]:
+        v1 = float(m1.get(k, 0.0))
+        v2 = float(m2.get(k, 0.0))
+        delta = v2 - v1
+        print(f"{k:<25} | {v1:<20.3f} | {v2:<20.3f} | {delta:+.3f}")
+    tm1 = m1.get("timing_ms", {})
+    tm2 = m2.get("timing_ms", {})
+    print(f"{'latency_mean_ms':<25} | {str(tm1.get('mean', '?')):<20} | {str(tm2.get('mean', '?')):<20} | -")
+    print(f"{'latency_p95_ms':<25} | {str(tm1.get('p95', '?')):<20} | {str(tm2.get('p95', '?')):<20} | -")
+
+
 def main():
     ap = argparse.ArgumentParser(prog="rubbish")
     ap.add_argument("--key", default="demo-key")
@@ -370,6 +461,19 @@ def main():
     p_ui = sub.add_parser("ui")
     p_ui.add_argument("--port", type=int, default=8000)
 
+    p_judge = sub.add_parser("judge", help="Run System-1 decision judge on query")
+    p_judge.add_argument("query")
+
+    p_jbench = sub.add_parser("judge-bench", help="Benchmark decision judge across dataset")
+    p_jbench.add_argument("--split", default=None, choices=["train", "dev", "test"], help="Dataset split")
+
+    p_trace = sub.add_parser("inspect-trace", help="Inspect trace entry by ID or query keyword")
+    p_trace.add_argument("trace_id")
+
+    p_comp = sub.add_parser("compare", help="Compare two metrics.json benchmark runs")
+    p_comp.add_argument("file1")
+    p_comp.add_argument("file2")
+
     args = ap.parse_args()
     _check_sealed_compat()
     ensure_identity()
@@ -383,6 +487,10 @@ def main():
         "chat": cmd_chat,
         "orchestrate": cmd_orchestrate,
         "ui": cmd_ui,
+        "judge": cmd_judge,
+        "judge-bench": cmd_judge_bench,
+        "inspect-trace": cmd_inspect_trace,
+        "compare": cmd_compare,
     }
     cmd_map[args.cmd](args)
 

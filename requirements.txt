@@ -3,3 +3,4 @@ uvicorn
 matplotlib>=3.8
 requests
 cryptography
+pytest>=8.0

@@ -14,14 +14,17 @@
     <span>RubbishRAG</span>
   </a>
   <ul class="nav-links">
-    <li><a href="index.html">📌 Overview & Story</a></li>
+    <li><a href="index.html">📌 Overview & Premise</a></li>
+    <li><a href="tasks.html">🎯 Tasks & Scope</a></li>
     <li><a href="architecture.html">🏛️ System Architecture</a></li>
+    <li><a href="adaptive-judge.html">🧠 Adaptive Judge (Bonus)</a></li>
     <li><a href="guide.html" class="active">🛠️ Engineering Guide</a></li>
     <li><a href="deliverables.html">📋 Deliverables & Rubric</a></li>
-    <li><a href="ui.html">🚀 Web Studio & Orchestrator</a></li>
+    <li><a href="glossary.html">📖 Metrics Glossary</a></li>
+    <li><a href="ui.html">🚀 Web Studio & Playground</a></li>
   </ul>
   <div class="sidebar-footer">
-    <p>RubbishRAG v1.0<br>ICS Interview Benchmark</p>
+    <p>RubbishRAG v2.0<br>Principal AI Take-Home</p>
   </div>
 </aside>
 
@@ -29,6 +32,7 @@
   <div class="container">
     <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
       <span class="badge badge-primary">Hands-On Methodology</span>
+      <span class="badge badge-success">Empirical Cycle</span>
     </div>
 
     <h1>🛠️ Engineering Guide: Scientific Probing</h1>
@@ -39,12 +43,13 @@
       <li><strong>Observe a Symptom:</strong> Run <code>python3 rubbish.py bepar "&lt;query&gt;"</code> and inspect which documents rank at top-1.</li>
       <li><strong>Formulate a Falsifiable Hypothesis:</strong> e.g., <em>"The retriever ranks document 9002 first because the word 'مالیات' is repeated 12 times in the poison document."</em></li>
       <li><strong>Run Diagnostic Probes:</strong> Execute targeted queries with varied lengths, slot values, or synonyms. Every probe is automatically logged to <code>traces/trace.jsonl</code> with exact timestamps and hit scores.</li>
+      <li><strong>Inspect Specific Traces:</strong> Run <code>python3 rubbish.py inspect-trace &lt;TRACE_ID_OR_KEYWORD&gt;</code> to inspect hit scores and rankings in detail.</li>
       <li><strong>Plot the Evidence:</strong> Run <code>python3 rubbish.py bekesh</code> (or <code>rapchik</code>) to generate scatter and histogram diagrams in <code>plots/</code>.</li>
       <li><strong>Implement the Fix:</strong> Write the solution in <code>rubbish_rag/</code> using decorator overrides.</li>
-      <li><strong>Verify Benchmark Shift:</strong> Run <code>python3 rubbish.py bench</code> to verify the visible accuracy increases without regressing latency.</li>
+      <li><strong>Compare Benchmark Runs:</strong> Run <code>python3 rubbish.py compare traces/baseline.json traces/improved.json</code> to verify benchmark shifts side-by-side.</li>
     </ol>
 
-    <h2>Using the CLI Tools</h2>
+    <h2>Developer Toolkit & CLI Commands</h2>
 
     <h3>1. Probing a Single Query (<code>bepar</code>)</h3>
     <pre><code>python3 rubbish.py bepar "رتبه C1 یعنی چی؟" --topk 5</code></pre>
@@ -56,7 +61,22 @@
       <li><code>fused</code>: Server-combined score (naive linear min-max combination).</li>
     </ul>
 
-    <h3>2. Generating Diagnostic Plots (<code>bekesh</code>)</h3>
+    <h3>2. Inspecting Logged Traces (<code>inspect-trace</code>)</h3>
+    <pre><code>python3 rubbish.py inspect-trace "رتبه C1"</code></pre>
+    <p>Pretty-prints the full retrieval response, score breakdown, and timestamps for matching trace entries in <code>traces/trace.jsonl</code>.</p>
+
+    <h3>3. Comparing Benchmark Runs (<code>compare</code>)</h3>
+    <pre><code>python3 rubbish.py compare traces/metrics_baseline.json traces/metrics.json</code></pre>
+    <p>Outputs a side-by-side comparison table of accuracy, answer accuracy, clarify accuracy, and latency percentiles.</p>
+
+    <h3>4. Running the System-1 Decision Judge (<code>judge</code> & <code>judge-bench</code>)</h3>
+    <pre><code># Single query decision:
+python3 rubbish.py judge "بانک صادرات به رتبه E3 وام میده؟"
+
+# Comprehensive quantitative benchmark:
+python3 rubbish.py judge-bench --split test</code></pre>
+
+    <h3>5. Generating Diagnostic Plots (<code>bekesh</code>)</h3>
     <pre><code>python3 rubbish.py bekesh</code></pre>
     <p>Generates four diagnostic diagrams in <code>plots/</code>:</p>
     <ul>
