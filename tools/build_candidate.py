@@ -260,7 +260,7 @@ def main():
         sh("git", "checkout", "-B", args.branch)
         sh("git", "rm", "-r", "--cached", "--quiet", ".")
         # clear working tree except .git (+ untracked dev dirs we keep)
-        keep = {".git", "traces", "plots", "submissions", ".venv",
+        keep = {".git", "traces", "submissions", ".venv",
                 ".candidate.json", ".DS_Store"}
         for entry in os.listdir(REPO):
             if entry in keep:
@@ -274,6 +274,8 @@ def main():
             shutil.move(os.path.join(tmp, entry), os.path.join(REPO, entry))
         assert not os.path.exists(os.path.join(REPO, "traces", "traces")), \
             "nested traces/ slipped through!"
+        assert not os.path.exists(os.path.join(REPO, "plots", "plots")), \
+            "nested plots/ slipped through!"
         sh("git", "add", "-A")
         sh("git", "add", "-f", "server/hidden_eval.enc", "server/*.pyc")
         # sealed bytecode must be tracked (candidate .gitignore skips *.pyc)
